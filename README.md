@@ -13,6 +13,11 @@ Built at MakeCU 2026 (Creativity track).
 - **Notify:** a student who is waiting taps Notify on the website. The stall with the longest
   current session gets a pop-up on its screen. The person inside holds a hand up in front of the
   radar to acknowledge, and the waiting student sees that they were notified.
+- **Rush-hour heads-up:** an opt-in push notification when the showers are about to get busy and
+  a stall is free right now.
+- **Report a problem:** report no hot water, a clogged drain or a broken light from the website.
+  The stall's screen shows the report until an RA resolves it.
+- **Event extras:** a "free food tonight" filter and an add-to-calendar button on every campus event.
 - **Ask the board:** a chat box on the website, powered by the Gemini API, that answers questions
   like "When should I shower before my 9 a.m.?" or "Is anything free right now?" from live data.
 - **Room speaker with synced lyrics:** music plays in the shower room and every screen in the room
