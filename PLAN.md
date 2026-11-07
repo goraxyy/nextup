@@ -187,9 +187,25 @@ Sponsor technologies used: Tiger Data, Gemini API (Ask the board only), Vultr, G
 
 ## Open questions
 
-- [ ] What exactly is the HCTG070V's interface and resolution? (Blocks the Phase 1 display setup)
-- [ ] Is the radar hand-hold reliable while someone is standing in the stall? If not, the waiting student sees "shown on their screen" instead of "acknowledged"
-- [ ] Music: popular songs (LRCLIB has synced lyrics for them, but playing them publicly needs a license; fine for a hackathon demo) or royalty-free tracks (legal, but almost none have synced lyrics, so you'd write LRC files for a few yourself)
-- [ ] Speakers: one per room (simplest, recommended) or one per stall with Snapcast?
-- [ ] How many devices for the demo? Two stalls show the "longest session" choice and lyric sync; the simulator can stand in for the second
-- [ ] Pick the domain. Shortlist (all unregistered on 2026-11-07): `showerchor.us` ("shower chorus"), `prunealert.us`, `waitinginatowel.us`, `areyoudoneyet.us`, `lastsong.us`, `stallstat.us` ("stall status"), `showergeni.us` ("shower genius"), `showercirc.us` ("shower circus"), `stillinthere.us`, `getoutoftheshower.us`
+Each question has a recommended answer. Tick it once the team agrees.
+
+- [ ] **Display: what are the HCTG070V's interface and resolution?** (Blocks the Phase 1 display setup)
+  - Recommendation: if it has an HDMI port, plug it in and read the modes it reports from `/sys/class/drm/card*-HDMI-A-1/modes`. The display announces its own resolution, so usually no config is needed.
+  - Design the kiosk for 1024×600 and check it at 800×480, with a layout that scales, so the UI works either way.
+  - If it only has a flat ribbon connector, it needs a driver board (ECE side).
+- [ ] **Is the radar hand-hold reliable while someone is standing in the stall?**
+  - Recommendation: test it first thing in Phase 2. Someone stands 0.5–1 m away while a hand is held 10–20 cm from the radar; log per-gate energies; use the radar's 0.2 m gate setting if the firmware offers it. Mount the radar beside the screen at chest height.
+  - Pass: 95% of holds detected and under 5% false triggers in 10 minutes.
+  - Either way, build Notify so the "shown on their screen" receipt always works and the acknowledgement is an upgrade on top. A weak hand-hold then never breaks the feature.
+- [ ] **Music: popular songs or royalty-free tracks?**
+  - Recommendation: for the demo, 10–15 popular songs the team owns, cached on the audio host. LRCLIB has synced lyrics for them.
+  - Add 2–3 royalty-free tracks with hand-written LRC files to show the legal path.
+  - Note in `CREDITS.md` and on Devpost that a real deployment needs public-performance and lyrics licensing.
+- [ ] **Speakers: one per room or one per stall?**
+  - Recommendation: one per room. There is no sync problem and only one audio host. Use Snapcast only if a large room needs a second speaker.
+- [ ] **How many devices for the demo?**
+  - Recommendation: at least one real stall plus one simulated stall (the simulator drives a second kiosk page on a laptop), which is enough to show "longest session" selection and lyric sync.
+  - Use two real stalls if you have two of each part. CURC lists only 2 LD2410C radars, so reserve them early if you need theirs.
+- [ ] **Which domain?**
+  - Recommendation: `showerchor.us`. It reads "shower chorus", fits the synced lyrics, and is short. Runner-up: `prunealert.us`. Both were still unregistered when rechecked on 2026-11-07.
+  - Full shortlist (all unregistered on 2026-11-07): `showerchor.us`, `prunealert.us`, `waitinginatowel.us`, `areyoudoneyet.us`, `lastsong.us`, `stallstat.us` ("stall status"), `showergeni.us` ("shower genius"), `showercirc.us` ("shower circus"), `stillinthere.us`, `getoutoftheshower.us`
