@@ -3,7 +3,10 @@
 Everything that is not electrical engineering. Wiring, power and the custom PCB are out of scope
 here, except where software has to configure or document them.
 
-Tick a box by changing `- [ ]` to `- [x]`. Each phase ends with a **Done when** check.
+**Live checklists:** each phase is a GitHub issue ([#1](https://github.com/goraxyy/nextup/issues/1)
+to [#11](https://github.com/goraxyy/nextup/issues/11), open questions in
+[#12](https://github.com/goraxyy/nextup/issues/12)). Tick boxes there; this file is the original
+plan. Each phase ends with a **Done when** check.
 
 Hardware assumed per stall: Raspberry Pi 3, HiLink LD2410C radar, HCTG070V 7" display (no touch),
 Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
