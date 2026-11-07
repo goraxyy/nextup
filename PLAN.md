@@ -1,33 +1,33 @@
 # NextUp build plan (software, middleware, infrastructure, content)
 
-Everything that is not electrical engineering. Wiring, power and the custom PCB are out of scope
-here, except where software has to configure or document them.
+Everything that is not electrical engineering. Wiring, power and hardware design are out of scope
+here, except where software has to configure them.
 
 **Live checklists:** each phase is a GitHub issue ([#1](https://github.com/goraxyy/nextup/issues/1)
 to [#11](https://github.com/goraxyy/nextup/issues/11), open questions in
 [#12](https://github.com/goraxyy/nextup/issues/12)). Tick boxes there; this file is the original
 plan. Each phase ends with a **Done when** check.
 
-Hardware assumed per stall: Raspberry Pi 3, HiLink LD2410C radar, HCTG070V 7" display (no touch),
-Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
+Hardware assumed per stall: Raspberry Pi 3, HiLink LD2410C radar, HCTG070V 7" display (no touch).
+One speaker per shower room on the 3.5 mm jack.
+
+Sponsor technologies used: Tiger Data, Gemini API (Ask the board only), Vultr, GoDaddy Registry.
 
 ---
 
 ## Phase 0: Foundations and contracts
 
 - [ ] Create the folder layout from the README (`device/ kiosk/ server/ web/ content/ audio/ infra/ sim/ docs/`) with a short README in each
-- [ ] Record stack decisions in `docs/decisions.md`: Python 3.11 + FastAPI, Postgres on Tiger Data, kiosk as a static web app, website from Lovable
+- [ ] Record stack decisions in `docs/decisions.md`: Python 3.11 + FastAPI, Postgres on Tiger Data, kiosk as a static web app, website in Vite + React served from the Vultr server
 - [ ] Write message contracts in `docs/contracts.md` (JSON shape and example for each):
   - [ ] `presence.update`, `session.start`, `session.end`
-  - [ ] `input.hold.progress`, `input.press`, `input.longpress`, `input.swipe`
+  - [ ] `input.hold.progress`, `input.hold`
   - [ ] `notify.request`, `notify.deliver`, `notify.ack`, `notify.expired`
   - [ ] `nowplaying.update`, `lyrics.ready`
   - [ ] `cards.feed`, `device.heartbeat`, `device.config`
 - [ ] Define IDs: `room_id`, `stall_id`, `device_id`; one auth token per device
-- [ ] Build the device simulator in `sim/`: emits presence, hand-hold, tactile and heartbeat events on a timeline, so every other phase can be built before hardware works
-- [ ] Create `.env.example` listing every secret: Gemini, Snowflake, Tiger Data URL, Vultr, xAI (Grok), Solana devnet keypair path, domain
-- [ ] Set up Cursor as the team's coding agent (SpaceXSI requirement) and note how it is used
-- [ ] Start the Notability process notebook: architecture sketch v1, stall screen sketch v1
+- [ ] Build the device simulator in `sim/`: emits presence, hand-hold and heartbeat events on a timeline, so every other phase can be built before hardware works
+- [ ] Create `.env.example` listing every secret: Gemini API key, Tiger Data connection URL, Vultr API key, domain
 
 **Done when:** the simulator's events reach a stub server and are printed.
 
@@ -50,26 +50,24 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 
 **Done when:** a Pi powers on and shows the kiosk page full-screen within 60 s, with no cursor and no blanking.
 
-## Phase 2: Device agent (presence and input)
+## Phase 2: Device agent (presence and hand-hold)
 
 - [ ] LD2410C driver in `device/radar/`: read frames at 256000 baud (report header `F4 F3 F2 F1`, tail `F8 F7 F6 F5`), parse target state, moving and stationary distance and energy
 - [ ] Turn on the radar's engineering mode to read per-gate energies
 - [ ] Radar config command: max distance gate and sensitivities, saved as a per-stall profile (the HLKRadarTool phone app works for quick tuning)
 - [ ] Presence state machine: FREE → OCCUPIED after 20 s present, OCCUPIED → FREE after 30 s absent; emit `session.start` and `session.end` with timestamps
-- [ ] Hand-hold detector on the radar: a sustained energy spike in the nearest gate for 2 s during a session; emit `input.hold.progress` (0 to 1) so the screen can fill a ring
-- [ ] Touchtronix SensX25 module in `device/tactile/`: wrap the vendor streaming script, classify press, long-press, swipe left and swipe right
-- [ ] Input arbitration: either the radar hand-hold or a tactile press counts as an acknowledgement
+- [ ] Hand-hold detector on the radar: a sustained energy spike in the nearest gate for 2 s during a session; emit `input.hold.progress` (0 to 1) so the screen can fill a ring, then `input.hold`
 - [ ] Local WebSocket server on `localhost:8765` that pushes events to the kiosk
 - [ ] Uplink client: WebSocket to the server with device token, 10 s heartbeat, exponential reconnect, and a SQLite queue that replays events after an outage
-- [ ] Zelos: stream radar gate energies and tactile frames, record calibration runs, and save the final thresholds to the stall profile
-- [ ] Unit tests with recorded data: frame parser, state machine, hold detector, tactile classifier
+- [ ] Calibration tools in `device/tools/`: log per-gate energies to CSV during test runs and plot them to pick thresholds; save the thresholds to the stall profile
+- [ ] Unit tests with recorded data: frame parser, state machine, hold detector
 
-**Done when:** entering the mock stall flips the state in under 25 s, and a 2 s hand-hold or a tactile press fires an acknowledgement, with under 5% false triggers in a 10-minute test.
+**Done when:** entering the mock stall flips the state in under 25 s, and a 2 s hand-hold fires an acknowledgement, with under 5% false triggers in a 10-minute test.
 
 ## Phase 3: Server core (Vultr and Tiger Data)
 
 - [ ] Provision a Vultr VM; Docker Compose with the API, Caddy (automatic HTTPS) and workers
-- [ ] Register the domain through GoDaddy Registry (`getnextup.us`, `nextupshower.us`, `shownextup.us` and `nextupnyc.us` were free on 2026-11-07); point DNS at the VM
+- [ ] Register the domain through GoDaddy Registry (shortlist in Open questions); point DNS at the VM
 - [ ] Tiger Data: tables `rooms`, `stalls`, `devices`; hypertables `presence_events`, `sessions`, `notify_events`, `device_telemetry`; compression and retention policies
 - [ ] FastAPI REST: stall status, sessions, queue, cards, now-playing, admin
 - [ ] WebSocket hub with three channels: devices, website clients, rooms (for now-playing)
@@ -79,15 +77,16 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 
 **Done when:** simulated devices and a browser both see live status changes within 1 s.
 
-## Phase 4: Student website (Lovable)
+## Phase 4: Student website
 
-- [ ] Generate the site in Lovable and sync it to `web/` on GitHub
+- [ ] Scaffold `web/` with Vite + React; build to static files served by Caddy on the Vultr server
 - [ ] Live status page: each stall's state, minutes in, queue length
 - [ ] Notify button, with a status line: sent, delivered, acknowledged
 - [ ] Busy hours: day-by-hour heatmap, "quiet times today", estimated wait
 - [ ] Events page (same cards the screens show)
-- [ ] Floor radio: add songs to the room queue, attach a dedication
-- [ ] Submissions: shower thoughts, kind notes for the next person, art
+- [ ] Floor radio: add songs to the room queue, attach a dedication, like the current song
+- [ ] Submissions: shower thoughts, kind notes for the next person
+- [ ] Ask the board chat box (backend in Phase 9)
 - [ ] Anonymous emoji identity per browser (no names, no accounts)
 - [ ] Browser notifications ("Stall 2 is free") and a PWA manifest (iPhones only allow web push for sites added to the home screen)
 
@@ -99,7 +98,7 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 - [ ] Limits: one Notify per requester every 10 min; nothing identifies either side
 - [ ] Deliver `notify.deliver` to the chosen device
 - [ ] Kiosk pop-up: full-screen message, chime, music ducked in that room, hold-progress ring
-- [ ] Acknowledgement from the radar hand-hold or a tactile press sends `notify.ack`; the requester's page shows "They've seen it"
+- [ ] Acknowledgement from the radar hand-hold sends `notify.ack`; the requester's page shows "They've seen it"
 - [ ] No acknowledgement: one more chime at 60 s, then a small banner; log the outcome
 - [ ] Two requesters at once: queue them and target different stalls when possible
 - [ ] Tests: selection rule, cooldowns, simultaneous requests, device offline mid-notify
@@ -115,8 +114,8 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 - [ ] Kiosk playback position = now − `started_at_ms` − Snapcast latency, using the chrony-synced clock
 - [ ] Lyrics service: fetch synced lyrics from LRCLIB (`/api/get` by title, artist, duration), cache them in the database, parse LRC lines `[mm:ss.xx] text`
 - [ ] Kiosk lyrics view: current line highlighted, previous and next dimmed; a visual fallback when no lyrics exist
-- [ ] Floor radio playback: website queue feeds MPD; dedications screened by Gemini before showing
-- [ ] Tactile controls: swipe = vote to skip (majority of occupied stalls in the room), long-press = like
+- [ ] Floor radio playback: website queue feeds MPD; dedications go through the moderation queue (Phase 7) before showing
+- [ ] Hand-hold during a song = vote to skip (majority of occupied stalls in the room)
 - [ ] Duck the volume during notify chimes; quiet-hours volume cap
 - [ ] Music library of royalty-free or properly licensed tracks only, with an attribution file
 
@@ -126,10 +125,10 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 
 - [ ] Card schema: `{id, type, title, body, image, url, priority, starts_at, ends_at, seconds, tags}`
 - [ ] Kiosk scheduler: notify pop-up > lyrics > cards; full-screen cards between songs, a bottom ticker while music plays; cache cards for offline use
-- [ ] Campus events worker: pull Columbia's Bedework calendar (`events.columbia.edu` `eventsFeed.do`, iCal or JSON) plus group calendar ICS feeds; normalize; Gemini writes a one-line card; tags `tonight`, `free-food`, `career`, `arts`, `sports`; short link to the event page
+- [ ] Campus events worker: pull Columbia's Bedework calendar (`events.columbia.edu` `eventsFeed.do`, iCal or JSON) plus group calendar ICS feeds; normalize; format each event as a one-line card from its title, time and place (truncated to fit); keyword tags `tonight`, `free-food`, `career`, `arts`, `sports`; short link to the event page
 - [ ] Wellness module: curated cards (sleep, hydration, stress, finals week), an animated box-breathing card, time-of-day rules (late night → sleep tips), campus support resources (verify names and hours from Columbia Health before publishing)
 - [ ] Getting-ready brief in the last minutes of a session: Open-Meteo weather plus the MTA real-time feed for the 1 train at 116 St (stop `117`, check `stops.txt`)
-- [ ] Moderation pipeline: every student submission goes through a Gemini safety check, then an admin queue
+- [ ] Moderation for student submissions and dedications: blocked-word filter, then an admin approval queue; nothing shows on a screen until approved
 
 **Done when:** the screen rotates real campus events and wellness cards, and keeps working with Wi-Fi off for 30 minutes.
 
@@ -137,28 +136,30 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 
 - [ ] Karaoke mode: lyrics view with sing-along emphasis
 - [ ] Duet mode: in a room with two occupied stalls, alternate lyric lines light up on each screen
-- [ ] Trivia between songs: question, answer revealed after 20 s; optional tactile True/False for a floor-vs-floor score
+- [ ] Trivia between songs from a question bank (`content/trivia.json`): question, answer revealed after 20 s
 - [ ] Name that tune: 5-second intro, then the reveal
-- [ ] Floor-wide story: Gemini writes one chapter per session, read aloud by text-to-speech; swipe left or right to pick the next branch for whoever is next
+- [ ] Floor-wide story: a pre-written branching story (`content/story.json`), one chapter per session; at the end, hold a hand up for path A or do nothing for path B, and the next person hears what happens
+- [ ] Chapter narration: pre-generated audio files (recorded by the team or made with an offline text-to-speech tool such as Piper on the server)
 - [ ] Shower oracle: hold a hand up for a silly fortune and a sound effect
-- [ ] Joke of the day with a rimshot, generated each morning by the Grok automation
+- [ ] Joke of the day with a rimshot, from a curated joke bank (`content/jokes.json`)
 - [ ] Soundscapes: rainforest, beach, rooftop rain, with matching visuals
 - [ ] Countdown cards: breaks, finals, campus traditions
-- [ ] Courtesy Kudos on Solana devnet: an acknowledged notify followed by a free stall within 5 min mints Kudos (SPL token) to the floor's wallet; floors spend Kudos on song requests; leaderboard read from the chain. Devnet only, no monetary value
 - [ ] Every module can be turned on or off per device from the admin page
 
 **Done when:** each module runs from the simulator and can be toggled live.
 
-## Phase 9: Analytics and AI
+## Phase 9: Analytics and Ask the board
 
 - [ ] Busy-hours API from the Tiger Data aggregates: heatmap data, best times today, wait estimate
-- [ ] Gemini function calling on the website: "When should I shower before my 9 a.m.?" calls the busy-hours API instead of guessing
-- [ ] Snowflake: nightly export of sessions, notify outcomes, card impressions and anonymized submissions
-- [ ] Snowflake Cortex (REST API): weekly floor report (summary plus sentiment trend of shower thoughts)
-- [ ] "Ask NextUp" on the website: Cortex Search over campus events and wellness resources
+- [ ] Ask the board endpoint `POST /ask` on the server, calling the Gemini API with function calling
+- [ ] Tools Gemini can call: `get_stall_status()`, `get_busy_hours(day)`, `get_wait_estimate()`, `get_events(when, tag)`, `get_wellness_resources()`, `get_now_playing(room)`
+- [ ] System prompt: answer only from tool results, keep answers to 1–2 sentences, decline unrelated questions, never reveal who is in a stall
+- [ ] Guardrails: rate limit per browser, a timeout with a plain fallback answer, Gemini API key only on the server
+- [ ] Log questions (no personal data) and which tools were called to Tiger Data, to find gaps
+- [ ] Test questions that must work: "When should I shower before my 9 a.m.?", "Is anything free right now?", "What's on campus tonight with free food?", "What's playing in room 1?"
 - [ ] Seed one simulated week of history, labeled as simulated, for an empty database
 
-**Done when:** the website shows the heatmap and answers a natural-language question from real data.
+**Done when:** Ask the board answers all four test questions correctly from live data.
 
 ## Phase 10: Admin, hardening and documentation
 
@@ -166,12 +167,8 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 - [ ] Failure modes: server down → kiosk keeps local status and cached cards; radar unplugged → "sensor offline" screen; agent and kiosk auto-restart
 - [ ] Security: rotate device tokens, rate limits, no personal data stored, privacy page (no cameras, no microphones)
 - [ ] Load test the WebSocket hub with 50 simulated devices
-- [ ] `docs/trace-firmware-behavior.md` for the Trace challenge: intended firmware behavior, states, radar UART and tactile interfaces, audio, power states, update path
-- [ ] `docs/touchtronix.md`: how the SensX25 is read and classified (for the Touchtronix challenge)
 - [ ] `CREDITS.md`: libraries, APIs, music and data sources (the handbook requires credit)
-- [ ] Notability: export 2+ canvas screenshots and write 1–2 sentences on how it was used
-- [ ] Devpost: tag the Creativity track and every sponsor challenge; describe Cursor and Grok usage and opt in to the SpaceXSI raffle
-- [ ] DEV Writing Challenge: publish the build write-up after the event
+- [ ] Devpost: tag the Creativity track and the Tiger Data, Gemini API, Vultr and GoDaddy Registry challenges
 
 **Done when:** a device survives a server restart and a Wi-Fi drop without manual help, and all docs above exist.
 
@@ -180,6 +177,6 @@ Touchtronix SensX25 tactile pad. One speaker per shower room on the 3.5 mm jack.
 ## Open questions
 
 - [ ] What exactly is the HCTG070V's interface and resolution?
-- [ ] Is the radar hand-hold reliable enough, or should the Touchtronix pad be the main acknowledgement input?
+- [ ] Is the radar hand-hold reliable enough while someone is standing in the stall? If not, what is the fallback input?
 - [ ] One speaker per room (simplest) or one per stall with Snapcast sync?
-- [ ] What counts as a "Grok Bot automation" for SpaceXSI? Ask MLH.
+- [ ] Pick the domain. Shortlist (all unregistered on 2026-11-07): `showerchor.us` ("shower chorus"), `prunealert.us`, `waitinginatowel.us`, `areyoudoneyet.us`, `lastsong.us`, `stallstat.us` ("stall status"), `showergeni.us` ("shower genius"), `showercirc.us` ("shower circus"), `stillinthere.us`, `getoutoftheshower.us`
