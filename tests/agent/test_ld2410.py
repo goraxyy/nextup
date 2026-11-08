@@ -395,3 +395,15 @@ def test_a_silent_sensor_ends_the_session_instead_of_staying_in_use(tmp_path):
     off.sensor.last_reading_at = now - 600
     off.check_sensor_lost(now)
     assert off.presence.state == "in_use"
+
+
+def test_the_filter_can_let_go_faster():
+    fast, normal = OccupancyFilter(score_down=10, free_hold_s=0.5), OccupancyFilter()
+    for f in (fast, normal):
+        samples(f, True, 0, 20)                                   # someone there: score 100
+    fast_out, normal_out = samples(fast, False, 2.0, 40), samples(normal, False, 2.0, 40)
+    assert 12 <= fast_out.index(False) <= 16                      # ~1.4 s to free
+    assert 30 <= normal_out.index(False) <= 35                    # the default: ~3.3 s, as before
+    cfg = load({**RADAR_ENV, "RADAR_SCORE_DOWN": "10", "RADAR_FREE_HOLD_SECONDS": "0.5"})
+    assert (cfg.radar_score_down, cfg.radar_free_hold_s) == (10, 0.5)
+    assert (load(RADAR_ENV).radar_score_down, load(RADAR_ENV).radar_free_hold_s) == (4, 1.0)

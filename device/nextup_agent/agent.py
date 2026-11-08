@@ -82,7 +82,8 @@ class Agent:
         if cfg.presence_sensor == "ld2410c":
             self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy,
                                        cfg.radar_min_cm, cfg.radar_debug, cfg.radar_hold, cfg.radar_hold_max_cm,
-                                       cfg.radar_hold_min_energy, setup=radar_setup(cfg), data_dir=cfg.data_dir)
+                                       cfg.radar_hold_min_energy, setup=radar_setup(cfg), data_dir=cfg.data_dir,
+                                       score_down=cfg.radar_score_down, free_hold_s=cfg.radar_free_hold_s)
             self.sensors = [self.sensor] + ([ultrasonic] if ultrasonic else [])
         else:
             self.sensor = ultrasonic

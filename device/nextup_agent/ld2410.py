@@ -303,21 +303,27 @@ def gates_text(energies) -> str:
 
 
 class OccupancyFilter:
-    """The sketch's score with hysteresis: call update() once per 100 ms sample."""
+    """The sketch's score with hysteresis: call update() once per 100 ms sample.
 
-    def __init__(self) -> None:
+    score_down and free_hold_s set how fast it lets go (RADAR_SCORE_DOWN, RADAR_FREE_HOLD_SECONDS):
+    faster frees the stall sooner after someone leaves, but risks a "free" blip while someone
+    stands very still.
+    """
+
+    def __init__(self, score_down: int = SCORE_DOWN, free_hold_s: float = FREE_HOLD_S) -> None:
+        self.score_down, self.free_hold_s = score_down, free_hold_s
         self.score = 0
         self.occupied = False
         self.low_since: float | None = None
 
     def update(self, raw: bool, now: float) -> bool:
-        self.score = max(0, min(100, self.score + (SCORE_UP if raw else -SCORE_DOWN)))
+        self.score = max(0, min(100, self.score + (SCORE_UP if raw else -self.score_down)))
         if not self.occupied and self.score >= OCCUPIED_ABOVE:
             self.occupied, self.low_since = True, None
         elif self.occupied:
             if self.score <= EMPTY_BELOW:
                 self.low_since = self.low_since if self.low_since is not None else now
-                if now - self.low_since >= FREE_HOLD_S:
+                if now - self.low_since >= self.free_hold_s:
                     self.occupied, self.low_since = False, None
             else:
                 self.low_since = None
@@ -333,7 +339,8 @@ class LD2410Sensor:
     def __init__(self, port: str = "/dev/serial0", baud: int = 256000, max_cm: int = 150, min_energy: int = 30,
                  min_cm: int = 0, debug: bool = False, hold: bool = False, hold_max_cm: int = 30,
                  hold_min_energy: int = 50, setup: RadarSetup | None = None,
-                 data_dir: pathlib.Path | None = None) -> None:
+                 data_dir: pathlib.Path | None = None, score_down: int = SCORE_DOWN,
+                 free_hold_s: float = FREE_HOLD_S) -> None:
         self.port, self.baud, self.max_cm, self.min_energy = port, baud, max_cm, min_energy
         self.setup, self.data_dir = setup, data_dir
         self.gate_cm: int | None = None
@@ -344,7 +351,7 @@ class LD2410Sensor:
         self.last_reading_at = 0.0
         self.frame: RadarFrame | None = None
         self.frame_at = 0.0
-        self.filter = OccupancyFilter()
+        self.filter = OccupancyFilter(score_down, free_hold_s)
         self.debug_at = 0.0
 
     def start(self, loop, on_reading) -> None:

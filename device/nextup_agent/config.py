@@ -49,6 +49,10 @@ class Config:
     radar_moving_sens: tuple[int, ...] | None = None
     radar_still_sens: tuple[int, ...] | None = None
     radar_nobody_s: int | None = None
+    # How fast the occupancy filter lets go once nobody's seen (ld2410.OccupancyFilter): the score
+    # falls this much per 100 ms, then must stay low this long. Defaults: about 3.3 s.
+    radar_score_down: int = 4
+    radar_free_hold_s: float = 1.0
     # Hand-hold on the radar: a moving target this close and this strong (while the pop-up shows).
     radar_hold: bool = True
     radar_hold_max_cm: int = 30
@@ -164,6 +168,8 @@ def load(env: dict | None = None) -> Config:
         radar_moving_sens=_gates(env, "RADAR_MOVING_SENS"),
         radar_still_sens=_gates(env, "RADAR_STILL_SENS"),
         radar_nobody_s=_num(env, "RADAR_NOBODY_SECONDS", None, int),
+        radar_score_down=max(1, min(100, _num(env, "RADAR_SCORE_DOWN", 4, int))),
+        radar_free_hold_s=max(0.0, _num(env, "RADAR_FREE_HOLD_SECONDS", 1.0)),
         radar_hold=env.get("RADAR_HOLD", "1").strip().lower() not in ("0", "off", "false", "no"),
         radar_hold_max_cm=_num(env, "RADAR_HOLD_MAX_CM", 30, int),
         radar_hold_min_energy=_num(env, "RADAR_HOLD_MIN_ENERGY", 50, int),
