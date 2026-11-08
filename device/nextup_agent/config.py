@@ -38,6 +38,8 @@ class Config:
     radar_baud: int = 256000
     radar_max_cm: int = 150       # radar targets farther than this are outside the stall
     radar_min_energy: int = 30    # weaker radar echoes (0-100) are ignored
+    radar_min_cm: int = 0         # radar targets closer than this (e.g. a flexing plastic cover) are ignored
+    radar_debug: bool = False     # log what the radar sees once a second, for tuning
     reading_every_s: float = 5.0
     heartbeat_every_s: float = 30.0
 
@@ -82,4 +84,6 @@ def load(env: dict | None = None) -> Config:
         radar_baud=_num(env, "RADAR_BAUD", 256000, int),
         radar_max_cm=_num(env, "RADAR_MAX_CM", 150, int),
         radar_min_energy=_num(env, "RADAR_MIN_ENERGY", 30, int),
+        radar_min_cm=_num(env, "RADAR_MIN_CM", 0, int),
+        radar_debug=env.get("RADAR_DEBUG", "").lower() in ("1", "true", "yes"),
     )

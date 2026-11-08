@@ -63,7 +63,8 @@ class Agent:
         ultrasonic = (FakeSensor() if cfg.fake_sensor
                       else UltrasonicSensor(cfg.trigger_pin, cfg.echo_pin, cfg.range_cm, cfg.sample_hz))
         if cfg.presence_sensor == "ld2410c":
-            self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy)
+            self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy,
+                                       cfg.radar_min_cm, cfg.radar_debug)
             self.sensors = [self.sensor, ultrasonic]
         else:
             self.sensor = ultrasonic

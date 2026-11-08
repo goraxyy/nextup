@@ -69,7 +69,13 @@ shower head and curtain (moving water and fabric can show up as targets). Then t
 
 Each line shows the moving and still targets, their energy (0-100), and the occupancy score.
 Set `RADAR_MAX_CM` just past where someone showers, so targets beyond the stall don't count, and
-`RADAR_MIN_ENERGY` above what the empty stall shows. The filter is the same as the team's Arduino
+`RADAR_MIN_ENERGY` above what the empty stall shows. With `RADAR_DEBUG=1` the agent logs the same
+view once a second while it runs, so you can tune without stopping it.
+
+Behind a waterproof plastic cover, fix the radar firmly to the cover (flat against it, or a fixed
+few millimeters behind it). The radar is made to catch tiny movements like breathing, so a cover
+that flexes in front of it looks like a person. If it still triggers, set `RADAR_MIN_CM` just past
+the distance the cover shows up at, so only targets farther away count. The filter is the same as the team's Arduino
 test: about 0.7 s of targets to count as present, about 3 s without them to count as gone; the
 agent's `ENTER_SECONDS` and `LEAVE_SECONDS` then apply on top.
 
@@ -89,6 +95,8 @@ laptop, `scripts/pi_env.py s1` prints a filled-in copy with the stall's token.
 | `PRESENCE_SENSOR` | ultrasonic | `ld2410c`: the radar decides presence, the HC-SR04 only the hand-hold |
 | `RADAR_PORT`, `RADAR_BAUD` | /dev/serial0, 256000 | The radar's serial port |
 | `RADAR_MAX_CM`, `RADAR_MIN_ENERGY` | 150, 30 | Radar targets farther or weaker than this don't count |
+| `RADAR_MIN_CM` | 0 | Radar targets closer than this don't count (a plastic cover that flexes) |
+| `RADAR_DEBUG` | off | Log what the radar sees once a second (`journalctl -u nextup-agent -f`) |
 | `FAKE_SENSOR` | off | Type `in`, `out` or `hold` instead of using the sensor |
 
 ## Install, calibrate, update

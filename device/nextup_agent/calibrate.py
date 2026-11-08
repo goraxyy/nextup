@@ -54,7 +54,7 @@ def radar(args) -> None:
     parser, occupancy = FrameParser(), OccupancyFilter()
     frame, frame_at, frames, next_sample, warned_at = None, 0.0, 0, time.monotonic(), 0.0
     print(f"Ctrl-C to stop. LD2410C on {args.port} at {args.baud} baud; "
-          f"a target counts within {args.max_cm} cm with energy >= {args.min_energy}.")
+          f"a target counts from {args.min_cm} to {args.max_cm} cm with energy >= {args.min_energy}.")
     with serial.Serial(args.port, args.baud, timeout=SAMPLE_S / 2) as port:
         while True:
             for f in parser.feed(port.read(256)):
@@ -69,7 +69,7 @@ def radar(args) -> None:
                           else "radar data stopped: loose wire?")
                     warned_at = now
                 continue
-            raw = sees_someone(frame, args.max_cm, args.min_energy)
+            raw = sees_someone(frame, args.max_cm, args.min_energy, args.min_cm)
             occupied = occupancy.update(raw, now)
             print(f"raw:{100 if raw else 0:3d}  score:{occupancy.score:3d}  {'OCCUPIED' if occupied else 'free    '}  "
                   f"moving: {frame.moving_cm:4d} cm E{frame.moving_energy:3d}  "
@@ -86,6 +86,7 @@ def main() -> None:
     parser.add_argument("--baud", type=int, default=256000)
     parser.add_argument("--max-cm", type=int, default=150)
     parser.add_argument("--min-energy", type=int, default=30)
+    parser.add_argument("--min-cm", type=int, default=0, help="ignore radar targets closer than this")
     args = parser.parse_args()
     try:
         radar(args) if args.radar else ultrasonic(args)

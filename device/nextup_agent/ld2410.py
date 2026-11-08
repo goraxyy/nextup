@@ -92,10 +92,14 @@ class FrameParser:
                 del self.buf[:1]
 
 
-def sees_someone(frame: RadarFrame, max_cm: int, min_energy: int) -> bool:
-    """A moving or still target close enough and strong enough (the sketch's `raw`)."""
-    moving = bool(frame.state & 1) and frame.moving_cm <= max_cm and frame.moving_energy >= min_energy
-    still = bool(frame.state & 2) and frame.still_cm <= max_cm and frame.still_energy >= min_energy
+def sees_someone(frame: RadarFrame, max_cm: int, min_energy: int, min_cm: int = 0) -> bool:
+    """A moving or still target inside the stall and strong enough (the sketch's `raw`).
+
+    min_cm ignores targets right in front of the radar, such as a plastic cover that flexes.
+    """
+    moving = (bool(frame.state & 1) and min_cm <= frame.moving_cm <= max_cm
+              and frame.moving_energy >= min_energy)
+    still = bool(frame.state & 2) and min_cm <= frame.still_cm <= max_cm and frame.still_energy >= min_energy
     return moving or still
 
 
@@ -132,12 +136,15 @@ class LD2410Sensor:
     Readings stop when no frame has arrived for STALE_S, so the agent's "sensor" dot goes off.
     """
 
-    def __init__(self, port: str = "/dev/serial0", baud: int = 256000, max_cm: int = 150, min_energy: int = 30) -> None:
+    def __init__(self, port: str = "/dev/serial0", baud: int = 256000, max_cm: int = 150, min_energy: int = 30,
+                 min_cm: int = 0, debug: bool = False) -> None:
         self.port, self.baud, self.max_cm, self.min_energy = port, baud, max_cm, min_energy
+        self.min_cm, self.debug = min_cm, debug
         self.last_reading_at = 0.0
         self.frame: RadarFrame | None = None
         self.frame_at = 0.0
         self.filter = OccupancyFilter()
+        self.debug_at = 0.0
 
     def start(self, loop, on_reading) -> None:
         threading.Thread(target=self._run, args=(loop, on_reading), daemon=True, name="ld2410c").start()
@@ -146,9 +153,16 @@ class LD2410Sensor:
         """One 100 ms step of the filter, or None while the radar is silent."""
         if self.frame is None or now - self.frame_at > STALE_S:
             return None
-        raw = sees_someone(self.frame, self.max_cm, self.min_energy)
+        f = self.frame
+        raw = sees_someone(f, self.max_cm, self.min_energy, self.min_cm)
         occupied = self.filter.update(raw, now)
-        return Reading(distance_cm=nearest_cm(self.frame), present=occupied)
+        if self.debug and now - self.debug_at >= 1.0:  # RADAR_DEBUG=1: one line a second, for tuning
+            self.debug_at = now
+            moving = f"{f.moving_cm:4d} cm E{f.moving_energy:3d}" if f.state & 1 else "   -          "
+            still = f"{f.still_cm:4d} cm E{f.still_energy:3d}" if f.state & 2 else "   -          "
+            log.info("radar: moving %s | still %s | counts %-3s | score %3d %s",
+                     moving, still, "yes" if raw else "no", self.filter.score, "OCCUPIED" if occupied else "free")
+        return Reading(distance_cm=nearest_cm(f), present=occupied)
 
     def _run(self, loop, on_reading) -> None:
         import serial  # pyserial; only needed on the Pi

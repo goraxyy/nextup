@@ -47,6 +47,23 @@ def test_engineering_mode_frames_are_read_too():
     assert FrameParser().feed(frame_bytes(kind=0x01, moving_cm=55))[0].moving_cm == 55
 
 
+def test_targets_right_in_front_of_the_radar_can_be_ignored():
+    cover = RadarFrame(1, 20, 100, 0, 0)            # plastic cover flexing 20 cm away
+    person = RadarFrame(3, 80, 60, 90, 50)
+    assert sees_someone(cover, max_cm=150, min_energy=30)                   # counts by default
+    assert not sees_someone(cover, max_cm=150, min_energy=30, min_cm=40)
+    assert sees_someone(person, max_cm=150, min_energy=30, min_cm=40)
+    assert load({**RADAR_ENV, "RADAR_MIN_CM": "40", "RADAR_DEBUG": "1"}).radar_min_cm == 40
+
+
+def test_debug_logging_shows_what_the_radar_sees(caplog):
+    s = LD2410Sensor(min_cm=40, debug=True)
+    s.frame, s.frame_at = RadarFrame(1, 20, 100, 0, 0), 10.0
+    with caplog.at_level("INFO", logger="nextup.ld2410"):
+        s.sample(10.0)
+    assert "moving   20 cm E100" in caplog.text and "counts no" in caplog.text
+
+
 def test_a_target_must_be_close_and_strong_enough():
     assert sees_someone(RadarFrame(1, 100, 60, 0, 0), max_cm=150, min_energy=30)
     assert not sees_someone(RadarFrame(1, 200, 60, 0, 0), max_cm=150, min_energy=30)   # beyond the stall
