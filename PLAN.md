@@ -75,7 +75,7 @@ design is in [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 
 Full design: [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 
-- [ ] Supabase project in East US: anonymous sign-in on, email sign-in for managers, RLS policies on `realtime.messages` for the private topics
+- [ ] Supabase project in East US: anonymous sign-in on, email sign-in for managers, RLS policies on `realtime.messages` (every topic private, clients read-only), "Allow public access" off
 - [ ] Script that creates one Supabase user per device, with `app_metadata.device_id`
 - [ ] Vercel project linked to the repo: `web/` as the site, `api/` as Python functions in `iad1`, env vars from `.env.example`
 - [ ] Tiger: turn on the transaction pooler; migration runner `tiger/migrate.py` with a `schema_migrations` table

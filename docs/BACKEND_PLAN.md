@@ -84,20 +84,27 @@ listener. Use an outbox table instead:
 
 ## Realtime channels
 
-| Topic | Type | Who reads it | Messages |
-|---|---|---|---|
-| `lab:<lab_id>` | public | Website, kiosks | `station.changed`, `queue.changed`, `report.changed` |
-| `browser:<uid>` | private | One browser | `queue.go`, `notify.receipt` |
-| `device:<device_id>` | private | One Pi | `notify.deliver`, `device.config` |
-| `admin:<lab_id>` | private | Lab managers | `safety.alert`, `device.offline` |
+Every topic is private. On a public topic, any client holding the publishable key can broadcast,
+so anyone could fake "station is free".
 
-- Private channels are guarded by RLS policies on `realtime.messages` in Supabase. A browser can
-  read only `browser:` plus its own uid. A device can read only `device:` plus the `device_id` in
-  its token's `app_metadata`. A manager can read only the labs listed in their `app_metadata`.
-- Public and private broadcasts don't mix: send with `private: true` to private topics.
+| Topic | Who reads it | Messages |
+|---|---|---|
+| `lab:<lab_id>` | Any signed-in browser, kiosks | `station.changed`, `queue.changed`, `report.changed` |
+| `browser:<uid>` | One browser | `queue.go`, `notify.receipt` |
+| `device:<device_id>` | One Pi | `notify.deliver`, `device.config` |
+| `admin:<lab_id>` | Lab managers | `safety.alert`, `device.offline` |
+
+- Turn off **Allow public access** in Supabase's Realtime settings, so only private channels work.
+- RLS policies on `realtime.messages` in Supabase decide who reads what. Any signed-in user
+  (anonymous sign-in counts) can read `lab:` topics. A browser can read only `browser:` plus its
+  own uid. A device can read only `device:` plus the `device_id` in its token's `app_metadata`. A
+  manager can read only the labs listed in their `app_metadata`.
+- No insert policy for broadcasts: clients can only listen. Only the API sends, using the secret
+  key and `private: true` on every message.
 - **Presence:** each Pi tracks itself on `lab:<lab_id>`, so the website shows online and offline
-  without polling. Heartbeats with telemetry still go to Tiger every 30 s, for history.
-- Safety alerts never go on the public `lab:` channel.
+  without polling. Presence needs one insert policy: `extension = 'presence'`, device users only.
+  Heartbeats with telemetry still go to Tiger every 30 s, for history.
+- Safety alerts go only to `admin:` topics, never to `lab:`.
 
 ## Identity
 
