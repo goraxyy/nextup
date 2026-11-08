@@ -304,21 +304,27 @@ def test_water_is_minutes_with_the_water_on_times_the_flow_rate(conn, room):
 
     conn.execute("update settings set water_gpm = 2.0")
     conn.execute("update stalls set state = 'in_use', since = now() - interval '5 minutes' where id = 's3'")
+    conn.execute("update stalls set state = 'in_use', since = now() - interval '20 seconds' where id = 's4'")
     conn.execute("delete from stall_events")
-    # One finished shower today: 10 minutes with the water on ('finishing' is water off).
+    # Today: one 10-minute shower, then 2 minutes finishing (water off), and a 30-second blip.
     conn.execute("insert into stall_events (time, stall_id, state, prev_state, prev_duration_s) values"
-                 " (now() - interval '2 seconds', 's2', 'in_use', 'free', 3600),"
-                 " (now() - interval '1 second', 's2', 'finishing', 'in_use', 600)")
+                 " (now() - interval '4 seconds', 's2', 'in_use', 'free', 3600),"
+                 " (now() - interval '3 seconds', 's2', 'finishing', 'in_use', 600),"
+                 " (now() - interval '2 seconds', 's2', 'free', 'finishing', 120),"
+                 " (now() - interval '1 second', 's5', 'free', 'in_use', 30)")
     now = conn.execute("select now() as now").fetchone()["now"]
     midnight = now.astimezone(insights.NY).replace(hour=0, minute=0, second=0, microsecond=0)
     live = min(5.0, (now - midnight).total_seconds() / 60)   # s3 has had the water on for 5 minutes
 
-    water = insights.room_insights(conn, room)["water"]
+    body = insights.room_insights(conn, room)
+    water, stats = body["water"], body["stats"]
     assert water["gpm"] == 2.0 and water["lpm"] == 7.6
-    assert water["today_gallons"] == round((10 + live) * 2.0)
+    assert water["today_gallons"] == round((10 + live) * 2.0)      # not the blip, nor s4's 20 seconds
     assert water["per_shower_gallons"] == 20.0
-    assert (water["running_now"], water["flowing_now_gpm"]) == (1, 2.0)
-    assert water["daily"][-1] == {"day": midnight.date().isoformat(), "gallons": 20, "showers": 1}
+    assert (water["running_now"], water["flowing_now_gpm"]) == (2, 4.0)   # flowing now is the live reading
+    assert water["daily"][-1] == {"day": midnight.date().isoformat(), "gallons": water["today_gallons"], "showers": 2}
+    assert stats["showers_today"] == 2                             # s2's finished shower and s3's running one
+    assert stats["avg_shower_minutes"] == 12.0                     # 10 minutes in use + 2 finishing
 
 
 def test_event_text_from_the_feed_is_unescaped_once_more():

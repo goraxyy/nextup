@@ -10,6 +10,7 @@ import heapq
 from zoneinfo import ZoneInfo
 
 NY = ZoneInfo("America/New_York")
+MIN_SHOWER_S = 60   # in use for less than this isn't a shower: a sensor blip, or someone passing by
 
 
 def _label(at: dt.datetime) -> str:
@@ -67,18 +68,22 @@ def room_insights(conn, room: str) -> dict:
     stalls = conn.execute("select id, state, since, simulated, timer_end from stalls where room_id = %s order by id",
                           [room]).fetchall()
     waiting = conn.execute("select count(*) as n from queue where status = 'waiting'").fetchone()["n"]
+    # A shower is a stretch in use (water on) of at least MIN_SHOWER_S, counted when it ends; the
+    # 'finishing' time after it (water off) still belongs to the average shower.
     stats = conn.execute(
-        "select count(*) filter (where e.state = 'in_use' and e.prev_state = 'free'"
+        "select count(*) filter (where e.prev_state = 'in_use' and e.prev_duration_s >= %(min)s"
         "         and e.time >= date_trunc('day', now() at time zone 'America/New_York') at time zone 'America/New_York') as today,"
-        "       sum(e.prev_duration_s) filter (where e.prev_state in ('in_use', 'finishing'))"
-        "         / nullif(count(*) filter (where e.state = 'in_use' and e.prev_state = 'free'), 0) / 60 as avg_minutes,"
+        "       (sum(e.prev_duration_s) filter (where e.prev_state = 'in_use' and e.prev_duration_s >= %(min)s)"
+        "        + coalesce(sum(e.prev_duration_s) filter (where e.prev_state = 'finishing'), 0))"
+        "         / nullif(count(*) filter (where e.prev_state = 'in_use' and e.prev_duration_s >= %(min)s), 0) / 60 as avg_minutes,"
         "       count(*) filter (where s.simulated) as simulated_events, count(*) as all_events,"
         "       min(e.time) as since"
         "  from stall_events e join stalls s on s.id = e.stall_id"
-        " where s.room_id = %s and e.time > now() - interval '4 weeks'",
-        [room],
+        " where s.room_id = %(room)s and e.time > now() - interval '4 weeks'",
+        {"room": room, "min": MIN_SHOWER_S},
     ).fetchone()
     avg_minutes = float(stats["avg_minutes"] or 15.0)
+    showering = _showering(stalls, now)
 
     in_use = sum(1 for s in stalls if s["state"] != "free")
     occupancy_now = in_use / len(stalls) if stalls else 0.0
@@ -106,7 +111,7 @@ def room_insights(conn, room: str) -> dict:
         "heatmap": profile,  # [dow 0 = Sunday][hour 0-23], share of stalls in use
         "stats": {
             "avg_shower_minutes": round(avg_minutes, 1),
-            "showers_today": stats["today"],
+            "showers_today": stats["today"] + len(showering),
             "busiest_hour_today": busiest_hour,
         },
         "basis": {
@@ -119,40 +124,60 @@ def room_insights(conn, room: str) -> dict:
 LITERS_PER_GALLON = 3.785
 
 
+def _showering(stalls: list[dict], now: dt.datetime) -> list[dict]:
+    """Stalls with the water on for at least MIN_SHOWER_S right now."""
+    return [s for s in stalls if s["state"] == "in_use" and (now - s["since"]).total_seconds() >= MIN_SHOWER_S]
+
+
 def water(conn, room: str, stalls: list[dict], now: dt.datetime) -> dict:
-    """Estimated water use: minutes with the water on (in_use) × the settings' flow rate."""
+    """Estimated water use: minutes with the water on (in_use) × the settings' flow rate.
+
+    Stretches in use shorter than MIN_SHOWER_S don't count (sensor blips), so the daily totals,
+    the shower counts and the average shower all agree with the stats.
+    """
     gpm = float(conn.execute("select water_gpm from settings where id = 1").fetchone()["water_gpm"])
     day_start = now.astimezone(NY).replace(hour=0, minute=0, second=0, microsecond=0)
+    shower = "e.prev_state = 'in_use' and e.prev_duration_s >= %(min)s"
+    args = {"room": room, "min": MIN_SHOWER_S, "day_start": day_start}
     done = conn.execute(
-        "select coalesce(sum(e.prev_duration_s), 0) / 60 as minutes from stall_events e join stalls s on s.id = e.stall_id"
-        " where s.room_id = %s and e.prev_state = 'in_use' and e.time >= %s",
-        [room, day_start],
-    ).fetchone()["minutes"]
-    running = [s for s in stalls if s["state"] == "in_use"]
-    live = sum((now - max(s["since"], day_start)).total_seconds() / 60 for s in running)
+        "select coalesce(sum(e.prev_duration_s), 0) / 60 as minutes, count(*) as showers"
+        "  from stall_events e join stalls s on s.id = e.stall_id"
+        f" where s.room_id = %(room)s and {shower} and e.time >= %(day_start)s",
+        args,
+    ).fetchone()
+    showering = _showering(stalls, now)
+    live = sum((now - max(s["since"], day_start)).total_seconds() / 60 for s in showering)
     per_shower = conn.execute(
         "select avg(e.prev_duration_s) / 60 as minutes from stall_events e join stalls s on s.id = e.stall_id"
-        " where s.room_id = %s and e.prev_state = 'in_use' and e.time > now() - interval '4 weeks'",
-        [room],
+        f" where s.room_id = %(room)s and {shower} and e.time > now() - interval '4 weeks'",
+        args,
     ).fetchone()["minutes"] or 0
     daily = conn.execute(
         "select time_bucket('1 day', e.time, 'America/New_York') as day,"
-        "       sum(e.prev_duration_s) filter (where e.prev_state = 'in_use') / 60 as minutes,"
-        "       count(*) filter (where e.state = 'in_use' and e.prev_state = 'free') as showers"
+        "       sum(e.prev_duration_s) / 60 as minutes, count(*) as showers"
         "  from stall_events e join stalls s on s.id = e.stall_id"
-        " where s.room_id = %s and e.time >= %s - interval '6 days'"
+        f" where s.room_id = %(room)s and {shower} and e.time >= %(day_start)s - interval '6 days'"
         " group by 1 order by 1",
-        [room, day_start],
+        args,
     ).fetchall()
-    today_gal = (float(done) + live) * gpm
+    today_gal = (float(done["minutes"]) + live) * gpm
+    days = [{"day": r["day"].astimezone(NY).date().isoformat(),
+             "gallons": round(float(r["minutes"] or 0) * gpm), "showers": r["showers"]} for r in daily]
+    # Today's bar includes showers still running, like the "today so far" figure.
+    today = {"day": day_start.date().isoformat(), "gallons": round(today_gal), "showers": done["showers"] + len(showering)}
+    if days and days[-1]["day"] == today["day"]:
+        days[-1] = today
+    else:
+        days.append(today)
+    running = [s for s in stalls if s["state"] == "in_use"]
     return {
         "gpm": gpm,
         "lpm": round(gpm * LITERS_PER_GALLON, 1),
+        "min_shower_s": MIN_SHOWER_S,
         "today_gallons": round(today_gal),
         "today_liters": round(today_gal * LITERS_PER_GALLON),
         "per_shower_gallons": round(float(per_shower) * gpm, 1),
         "running_now": len(running),
         "flowing_now_gpm": round(len(running) * gpm, 1),
-        "daily": [{"day": r["day"].astimezone(NY).date().isoformat(),
-                   "gallons": round(float(r["minutes"] or 0) * gpm), "showers": r["showers"]} for r in daily],
+        "daily": days,
     }

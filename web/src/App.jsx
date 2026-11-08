@@ -328,11 +328,11 @@ function WaterCard({ water }) {
         <div><dt>Flowing now</dt><dd>{water.flowing_now_gpm}<small> gal/min</small></dd><span className="sub">{water.running_now} shower{water.running_now === 1 ? '' : 's'} on</span></div>
         <div><dt>Per showerhead</dt><dd>{water.gpm}<small> gal/min</small></dd><span className="sub">{water.lpm} L/min</span></div>
       </dl>
-      {/* Today's bar includes showers still running, like the tile above it. */}
-      <DailyWater daily={water.daily.map((d, i) => (i === water.daily.length - 1 ? { ...d, gallons: water.today_gallons } : d))} />
+      <DailyWater daily={water.daily} />
       <p className="source">
         Shower minutes with the water on × {water.gpm} gal/min, the EPA's figure for a standard showerhead
-        (WaterSense heads use 2.0 or less). The last minute of each shower counts as water off.
+        (WaterSense heads use 2.0 or less). The last minute of each shower counts as water off, and anything
+        under a minute isn't counted as a shower.
       </p>
     </section>
   )
