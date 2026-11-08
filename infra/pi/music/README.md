@@ -15,6 +15,22 @@ cover the whole screen (by about 7 s). From 7 to 10 s they move about every whic
 float off (about 11 seconds in all). It happens once per shower.
 `MUSIC_SHAMPOO_AFTER=0` turns it off.
 
+## "How long will your shower be?" (`GOAL_ASK_SECONDS`, not tied to music)
+
+When a shower starts, the lion asks for a goal: Quick 5 min, Normal 10, Long 15
+(`GOAL_OPTIONS=5,10,15`). It's answered with the sensor, by **hold, watch, release**:
+
+1. Raise a hand to the sensor. After 1 s, a highlight walks along the options, 1.2 s each
+   (Quick, Normal, Long, then back round).
+2. Lower the hand when your pick is lit. The lion confirms: "10 minutes, got it!"
+3. No answer within 15 s skips it quietly.
+
+While the question shows, a raised hand only answers it: music gestures wait, and a Hurry
+pop-up still comes first. With a goal set, the status page counts down to it ("6 min left",
+then "2 min over"), and the exit celebration compares against it ("Done in 9 of your 10 min").
+`GOAL_ASK_SECONDS=0` turns it off. It needs a hand sensor: the radar with `RADAR_HOLD`, or
+the HC-SR04.
+
 ## Exit celebration (`CELEBRATE_SECONDS`, not tied to music)
 
 When someone leaves after a real shower (at least a minute), the lion celebrates for 10 seconds

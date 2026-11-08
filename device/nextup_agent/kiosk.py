@@ -51,7 +51,9 @@ class Kiosk:
             "music_hint": None,      # None: music off; "": show "NextUp <stall name>"
             "music_nudge": None,     # {"songs", "level", "until"}: the lion asks them to shower faster
             "shampoo": None,         # {"until"}: "Let's shampoo!" and a wave of bubbles (after 2 songs)
-            "celebrate": None,       # {"secs", "until"}: the lion thanks them on the way out
+            "celebrate": None,       # {"secs", "until", "goal"}: the lion thanks them on the way out
+            "goal_ask": None,        # {"options", "highlight", "arming", "until", "chosen"}: "How long?"
+            "shower_goal": None,     # minutes they chose for this shower
         }
 
     def publish(self, **changes) -> None:

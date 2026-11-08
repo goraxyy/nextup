@@ -69,6 +69,10 @@ class Config:
     music_shampoo_after: int = 2  # after this many songs, "Let's shampoo!" and a wave of bubbles (0: never)
     # Experimental: when someone leaves after a real shower, the lion celebrates for this long (0: never).
     celebrate_s: float = 10.0
+    # Experimental: when a shower starts, ask "How long will your shower be?" for this long,
+    # answered with a hand raised to the sensor (shower_goal.py). 0: never ask.
+    goal_ask_s: float = 15.0
+    goal_options: tuple[int, ...] = (5, 10, 15)
     spotify_token_file: pathlib.Path | None = None  # its refresh token, from scripts/spotify_login.py
     page_status_s: float = 10.0    # cycling pages on the stall screen
     page_event_s: float = 8.0
@@ -107,6 +111,12 @@ def load(env: dict | None = None) -> Config:
     if not ultrasonic and presence_sensor != "ld2410c":
         raise SystemExit("ULTRASONIC=off needs PRESENCE_SENSOR=ld2410c: without the radar, the HC-SR04 is the only sensor")
     gate_cm = _num(env, "RADAR_GATE_CM", 75, int)
+    try:
+        goal_options = tuple(int(v) for v in env.get("GOAL_OPTIONS", "5,10,15").split(",") if v.strip())
+    except ValueError:
+        raise SystemExit(f"GOAL_OPTIONS must be minutes separated by commas (got {env.get('GOAL_OPTIONS')!r})") from None
+    if not 1 <= len(goal_options) <= 4 or min(goal_options) < 1:
+        raise SystemExit("GOAL_OPTIONS needs 1 to 4 choices in minutes, like 5,10,15")
     music = env.get("MUSIC", "").strip().lower()
     music = "" if music in ("", "0", "off", "false", "no") else music
     if music not in ("", "spotify", "spotify-web"):
@@ -163,6 +173,8 @@ def load(env: dict | None = None) -> Config:
         music_nudge_every=_num(env, "MUSIC_NUDGE_EVERY", 5, int),
         music_shampoo_after=_num(env, "MUSIC_SHAMPOO_AFTER", 2, int),
         celebrate_s=_num(env, "CELEBRATE_SECONDS", 10.0),
+        goal_ask_s=_num(env, "GOAL_ASK_SECONDS", 15.0),
+        goal_options=goal_options,
         spotify_token_file=pathlib.Path(env.get("SPOTIFY_TOKEN_FILE")
                                         or pathlib.Path(env.get("NEXTUP_DATA_DIR", "/var/lib/nextup")) / "spotify-token.json"),
     )

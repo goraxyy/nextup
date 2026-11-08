@@ -24,6 +24,7 @@ from .kiosk import Kiosk
 from .ld2410 import LD2410Sensor, RadarSetup
 from .presence import Presence
 from .sensor import FakeSensor, Reading, UltrasonicSensor
+from .shower_goal import GoalChooser
 from .stall_music import LibrespotPlayer, SpotifyWebPlayer, StallMusic
 from .realtime import DeviceChannel, SupabaseSession
 from .uplink import Uplink, now_iso
@@ -96,6 +97,9 @@ class Agent:
         self.stall_music = (StallMusic(player, self.kiosk, in_use=lambda: self.presence.state == "in_use",
                                        nudge_every=cfg.music_nudge_every,
                                        shampoo_after=cfg.music_shampoo_after) if player else None)
+        # Experimental: "How long will your shower be?" answered with a raised hand (GOAL_ASK_SECONDS).
+        hand = cfg.ultrasonic or (cfg.presence_sensor == "ld2410c" and cfg.radar_hold)
+        self.goal = GoalChooser(cfg.goal_options, cfg.goal_ask_s) if cfg.goal_ask_s and hand else None
         if self.stall_music:  # the hint on the screen: how to get your music on it
             self.kiosk.publish(music_hint="Spotify (lyrics show here)" if cfg.music == "spotify-web"
                                else f"Spotify → {cfg.music_device_name}" if cfg.music_device_name else "")
@@ -115,12 +119,17 @@ class Agent:
                 self.uplink.enqueue("session.start")
                 if self.stall_music:
                     self.stall_music.new_shower()
+                if self.goal:
+                    self.kiosk.publish(goal_ask=self.goal.start(now), shower_goal=None)
                 self.kiosk.publish(stall_state="in_use", since=now_iso(), reserved_until=None)
             elif kind == "session.end":
                 self.uplink.enqueue("session.end")
                 if self.stall_music:
                     self.stall_music.new_shower()
                 self.celebrate()
+                if self.goal:
+                    self.goal.stop()
+                    self.kiosk.publish(goal_ask=None, shower_goal=None)
                 self.set_notify(None, stall_state="free", since=now_iso())
             elif kind == "hold.progress":
                 self.kiosk.publish(hold=value)
@@ -128,8 +137,27 @@ class Agent:
                 self.uplink.enqueue("input.hold")
                 if self.kiosk.state["notify"]:
                     self.set_notify(None, thanks_until=time.time() + 4)
-        if self.stall_music and reading.hold_near is not None:  # radar gestures for the music
+        # A raised hand: the Hurry pop-up comes first (Presence), then the shower-goal question,
+        # then the music gestures.
+        near = reading.hold_near if reading.hold_near is not None else (
+            reading.distance_cm is not None and reading.distance_cm <= self.cfg.hold_max_cm
+            if reading.present is None and self.cfg.ultrasonic else None)
+        if self.goal and self.goal.asking and near is not None and not self.presence.hold_armed:
+            self.on_goal(self.goal.update(near, now))
+        elif self.stall_music and reading.hold_near is not None:  # radar gestures for the music
             self.stall_music.on_hand(reading.hold_near, now, hurry_showing=self.presence.hold_armed)
+
+    def on_goal(self, shown: dict | None) -> None:
+        if shown is None:
+            return
+        if shown.get("skipped"):
+            log.info("shower goal: no answer, skipped")
+            self.kiosk.publish(goal_ask=None)
+        elif shown["chosen"]:
+            log.info("shower goal: %d min", shown["chosen"])
+            self.kiosk.publish(goal_ask=shown, shower_goal=shown["chosen"])
+        else:
+            self.kiosk.publish(goal_ask=shown)
 
     def celebrate(self) -> None:
         """Experimental (CELEBRATE_SECONDS): the lion thanks them on the way out, with their time
@@ -142,7 +170,8 @@ class Agent:
         except ValueError:
             return
         if secs >= 60:
-            self.kiosk.publish(celebrate={"secs": round(secs), "until": time.time() + self.cfg.celebrate_s})
+            self.kiosk.publish(celebrate={"secs": round(secs), "until": time.time() + self.cfg.celebrate_s,
+                                          "goal": self.kiosk.state.get("shower_goal")})
 
     def sensor_ok(self) -> bool:
         return time.monotonic() - self.sensor.last_reading_at < 5
