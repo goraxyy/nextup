@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NextUp stall</title>
 <style>
-  /* Columbia palette (visualidentity.columbia.edu): navy #003087, Columbia Blue #B9D9EB (dark
-     text only), accent #C75000, transactional green #228848. Fonts are bundled for offline use.
-     Everything is laid out on an 800 × 480 stage (the stall's screen) and scaled to fit, so the
-     same layout works on a 1024 × 600 screen too. */
-  @font-face { font-family: "EB Garamond"; font-weight: 400; src: url(fonts/eb-garamond-latin-400-normal.woff2) format("woff2"); }
+  /* Columbia palette (visualidentity.columbia.edu): navy #003087, Columbia Blue #B9D9EB, accent
+     #C75000, transactional green #228848, on soft Columbia Blue tints. Fonts are bundled for
+     offline use. The mascot is an original lion cub drawn here in SVG (not Columbia's Roaree or
+     any Columbia mark: NextUp isn't an official Columbia service), animated with CSS.
+     Everything is laid out on an 800 × 480 stage (the stall's screen) and scaled to fit. */
   @font-face { font-family: "EB Garamond"; font-weight: 600; src: url(fonts/eb-garamond-latin-600-normal.woff2) format("woff2"); }
   @font-face { font-family: "Montserrat"; font-weight: 400; src: url(fonts/montserrat-latin-400-normal.woff2) format("woff2"); }
   @font-face { font-family: "Montserrat"; font-weight: 500; src: url(fonts/montserrat-latin-500-normal.woff2) format("woff2"); }
@@ -17,219 +17,275 @@
   @font-face { font-family: "Montserrat"; font-weight: 700; src: url(fonts/montserrat-latin-700-normal.woff2) format("woff2"); }
 
   :root {
-    --navy: #003087; --navy-deep: #00205c; --cu-blue: #B9D9EB; --sky: #6CACE4; --bright: #0077C8;
-    --accent: #C75000; --accent-soft: #ffb37a; --green: #228848; --white: #ffffff;
-    --muted: rgba(185, 217, 235, 0.72); --glass: rgba(185, 217, 235, 0.12); --track: #1d3266;
+    --navy: #003087; --ink: #10284f; --muted: #4f6b90; --cu-blue: #B9D9EB; --sky: #6CACE4; --bright: #0077C8;
+    --accent: #C75000; --accent-soft: #ffd9bf; --green: #228848; --white: #ffffff;
+    --card: rgba(255, 255, 255, 0.86); --shadow: 0 10px 28px rgba(0, 48, 135, 0.13);
     --serif: "EB Garamond", Garamond, "Times New Roman", serif;
     --sans: Montserrat, Arial, sans-serif;
     --s: 1;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; background: #001339; }
-  body { color: var(--white); font-family: var(--sans); font-size: 18px; line-height: 1.4; }
+  html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; background: #cfe5f3; }
+  body { color: var(--ink); font-family: var(--sans); font-size: 18px; line-height: 1.35; }
 
   #stage { position: absolute; left: 50%; top: 50%; width: 800px; height: 480px; overflow: hidden;
            transform: translate(-50%, -50%) scale(var(--s));
-           background: radial-gradient(circle at 15% 0%, #0b3c9e 0%, var(--navy-deep) 55%, #001339 100%); }
+           background: radial-gradient(circle at 18% 10%, #ffffff 0%, #eaf4fb 38%, #d2e7f4 100%); }
   .ico { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
          stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.14em; }
   .ico.solid { fill: currentColor; stroke: none; }
 
+  /* Floating bubbles behind everything */
+  .bg-bubble { position: absolute; border-radius: 50%; border: 2px solid rgba(108, 172, 228, 0.35);
+               background: radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.9), rgba(185, 217, 235, 0.25));
+               animation: float-up linear infinite; bottom: -60px; will-change: transform; }
+  @keyframes float-up { from { transform: translateY(0); } to { transform: translateY(-620px); } }
+
   /* Top bar */
-  .top { position: absolute; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 14px;
-         padding: 0 22px; background: rgba(0, 48, 135, 0.9); border-bottom: 3px solid var(--cu-blue); z-index: 2; }
-  .brand { font-family: var(--serif); font-size: 25px; font-weight: 600; letter-spacing: 0.01em; }
-  .sep { width: 1px; height: 22px; background: rgba(185, 217, 235, 0.35); }
-  .top .name { font-size: 16px; font-weight: 600; }
-  .state { font-size: 14px; font-weight: 700; padding: 3px 12px; border-radius: 999px; white-space: nowrap; }
+  .top { position: absolute; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 12px;
+         padding: 0 20px 0 14px; background: rgba(255, 255, 255, 0.78); border-bottom: 3px solid var(--cu-blue); z-index: 2; }
+  .brand { display: flex; align-items: center; gap: 6px; font-weight: 700; font-size: 21px; color: var(--navy); }
+  .brand svg { width: 38px; height: 38px; }
+  .sep { width: 1px; height: 22px; background: var(--cu-blue); }
+  .top .name { font-size: 15px; font-weight: 600; color: var(--muted); }
+  .state { font-size: 14px; font-weight: 700; padding: 4px 12px; border-radius: 999px; white-space: nowrap;
+           display: inline-flex; align-items: center; gap: 6px; }
   .state.free { background: var(--green); color: var(--white); }
-  .state.in_use { background: var(--cu-blue); color: var(--navy); }
+  .state.in_use { background: var(--navy); color: var(--white); }
+  .state .ico { font-size: 15px; }
   .spacer { flex: 1; }
-  .wait-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--navy);
-               background: var(--accent-soft); padding: 3px 12px 3px 9px; border-radius: 999px; white-space: nowrap; }
-  .health { display: flex; gap: 8px; font-size: 18px; color: #5b6b8c; }
-  .health .on { color: #4ade80; }
-  .clock { font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 86px; text-align: right; white-space: nowrap; }
+  .wait-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--accent);
+               background: var(--accent-soft); padding: 4px 12px 4px 9px; border-radius: 999px; white-space: nowrap; }
+  .health { display: flex; gap: 8px; font-size: 18px; color: #a9bad0; }
+  .health .on { color: var(--green); }
+  .clock { font-size: 20px; font-weight: 700; color: var(--navy); font-variant-numeric: tabular-nums; min-width: 82px;
+           text-align: right; white-space: nowrap; }
 
   /* Pages */
-  .page { position: absolute; top: 55px; bottom: 26px; left: 0; right: 0; padding: 18px 36px;
-          opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; pointer-events: none; }
+  .page { position: absolute; top: 55px; bottom: 24px; left: 0; right: 0; padding: 14px 30px 10px;
+          opacity: 0; transform: translateY(12px) scale(0.985); transition: opacity 0.55s ease, transform 0.55s ease; }
   .page.show { opacity: 1; transform: none; }
+  .page:not(.show) * { animation-play-state: paused !important; }
   #stage.reserved .page { bottom: 46px; }
   #stage.reserved .pagedots { display: none; }
-  .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cu-blue);
-            display: flex; align-items: center; gap: 8px; }
-  h2 { font-family: var(--serif); font-weight: 600; margin: 0; line-height: 1.04; text-wrap: balance; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--bright);
+            display: flex; align-items: center; gap: 7px; }
+  h2 { font-weight: 700; margin: 0; line-height: 1.08; color: var(--navy); text-wrap: balance; letter-spacing: -0.01em; }
   .chips { display: flex; flex-wrap: wrap; gap: 8px; }
-  .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; color: var(--cu-blue); background: var(--glass);
-          border-radius: 999px; padding: 5px 13px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-  .chip b { color: var(--white); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
-  .chip .ico { font-size: 17px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 14px; color: var(--muted); background: var(--card);
+          border-radius: 999px; padding: 6px 13px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis;
+          box-shadow: 0 3px 10px rgba(0, 48, 135, 0.08); }
+  .chip b { color: var(--navy); font-weight: 700; overflow: hidden; text-overflow: ellipsis; }
+  .chip .ico { font-size: 16px; color: var(--bright); }
+  .card { background: var(--card); border-radius: 22px; box-shadow: var(--shadow); }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; font-weight: 700;
+          font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .pill.free { background: var(--green); color: var(--white); }
+  .pill.in_use { background: var(--navy); color: var(--white); }
+  .scene { display: block; width: 100%; height: 100%; overflow: visible; }
+  .stage-blob { position: relative; border-radius: 50%; background: radial-gradient(circle at 50% 45%, #ffffff 0%, #e4f1fa 62%, rgba(228, 241, 250, 0) 72%); }
 
   /* Status */
-  .status { display: grid; grid-template-columns: 236px 1fr; gap: 34px; align-items: center; }
-  .visual { position: relative; width: 236px; height: 236px; display: grid; place-items: center; }
-  .free-badge { width: 176px; height: 176px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #2fa95c, var(--green) 70%);
-                display: grid; place-items: center; position: relative; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35); }
-  .free-badge .ico { font-size: 92px; stroke-width: 1.6; color: var(--white); }
-  .ripple { position: absolute; inset: 30px; border-radius: 50%; border: 3px solid rgba(47, 169, 92, 0.6); animation: ripple 3s ease-out infinite; }
-  .ripple.two { animation-delay: 1.5s; }
-  @keyframes ripple { from { transform: scale(0.95); opacity: 1; } to { transform: scale(1.32); opacity: 0; } }
-  .timer { width: 236px; height: 236px; }
-  .timer circle { fill: none; stroke-width: 16; }
-  .timer .track { stroke: var(--track); }
-  .timer .fill { stroke: var(--cu-blue); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
-                 transition: stroke-dashoffset 0.9s linear, stroke 0.6s; }
-  .timer.over .fill { stroke: var(--accent); }
-  .timer-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-  .timer-text b { font-size: 54px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-  .timer-text span { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
-  .pill { display: inline-block; padding: 4px 16px; border-radius: 999px; font-weight: 700; font-size: 15px;
-          letter-spacing: 0.12em; text-transform: uppercase; }
-  .pill.free { background: var(--green); color: var(--white); }
-  .pill.in_use { background: var(--cu-blue); color: var(--navy); }
-  .status h2 { font-size: 52px; margin: 12px 0 8px; }
-  .status .sub { font-size: 20px; color: var(--cu-blue); }
-  .queue { display: flex; align-items: center; gap: 4px; margin: 14px 0 16px; min-height: 36px; color: var(--accent-soft); font-size: 34px; }
-  .queue .more { font-size: 20px; font-weight: 700; margin-left: 6px; }
-  .queue.empty { color: rgba(185, 217, 235, 0.35); }
+  .status { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: center; }
+  .status .stage-blob { width: 300px; height: 352px; }
+  .status h2 { font-size: 38px; margin: 10px 0 4px; }
+  .status .sub { font-size: 17px; color: var(--muted); margin-bottom: 12px; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat { display: flex; align-items: center; gap: 12px; padding: 12px 14px; min-width: 0; }
+  .stat .big { font-size: 34px; font-weight: 700; color: var(--navy); line-height: 1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .stat .lbl { font-size: 12px; font-weight: 600; color: var(--muted); margin-top: 5px; white-space: nowrap; }
+  .stat .badge-ico { width: 52px; height: 52px; flex: none; border-radius: 16px; display: grid; place-items: center;
+                     background: #e4f1fa; color: var(--bright); font-size: 28px; }
+  .stat.over .badge-ico { background: var(--accent-soft); color: var(--accent); }
+  .stat.over .big { color: var(--accent); }
+  .drop-meter { width: 46px; height: 58px; flex: none; }
+  .avgbar { margin-top: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); }
+  .avgbar .track { flex: 1; height: 12px; border-radius: 12px; background: #e4eef7; position: relative; overflow: visible; }
+  .avgbar .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 12px; background: linear-gradient(90deg, var(--sky), var(--bright));
+                  transition: width 0.9s linear; }
+  .avgbar.over .fill { background: linear-gradient(90deg, #f0a46e, var(--accent)); }
+  .avgbar b { color: var(--navy); white-space: nowrap; }
+  .queue { display: flex; align-items: center; gap: 2px; margin-top: 12px; min-height: 34px; }
+  .queue svg { width: 34px; height: 34px; }
+  .queue .more { font-size: 18px; font-weight: 700; margin-left: 6px; color: var(--accent); }
+  .queue .none { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .free-hint { margin-top: 14px; }
 
   /* Event */
-  .event { display: grid; grid-template-columns: 330px 1fr; gap: 28px; align-items: center; }
-  .photo { width: 330px; height: 338px; border-radius: 20px; overflow: hidden; position: relative;
-           box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45); background: var(--navy); }
+  .event { display: grid; grid-template-columns: 318px 1fr; gap: 30px; align-items: center; }
+  .polaroid { position: relative; width: 300px; height: 330px; margin-left: 8px; padding: 12px 12px 44px; background: var(--white);
+              border-radius: 10px; box-shadow: 0 16px 34px rgba(0, 48, 135, 0.2); transform: rotate(-2.5deg); }
+  .polaroid .photo { position: relative; width: 100%; height: 100%; border-radius: 4px; overflow: hidden; background: #dce9f3; }
   .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
-  .photo img.backdrop { object-fit: cover; filter: blur(20px) brightness(0.55); transform: scale(1.15); }
-  .badge { position: absolute; top: 12px; left: 12px; background: var(--green); color: var(--white); font-size: 13px; font-weight: 700;
-           text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 999px; }
+  .photo img.backdrop { object-fit: cover; filter: blur(18px) brightness(0.9); transform: scale(1.15); }
+  .tape { position: absolute; top: -12px; left: 50%; width: 96px; height: 26px; transform: translateX(-50%) rotate(3deg);
+          background: rgba(185, 217, 235, 0.75); border-radius: 3px; }
+  .polaroid .caption { position: absolute; left: 0; right: 0; bottom: 10px; text-align: center; font-family: var(--serif);
+                       font-size: 19px; color: var(--muted); }
+  .badge { position: absolute; top: 10px; right: 10px; background: var(--green); color: var(--white); font-size: 12px; font-weight: 700;
+           text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 11px; border-radius: 999px; }
+  .peek { position: absolute; left: -34px; bottom: -40px; width: 130px; height: 140px; transform: rotate(2.5deg); }
   .event .text { min-width: 0; display: flex; flex-direction: column; }
-  .event h2 { font-size: 40px; margin: 10px 0 16px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  .meta { display: flex; align-items: center; gap: 10px; font-size: 19px; margin-top: 6px; min-width: 0; }
+  .event h2 { font-size: 34px; margin: 8px 0 14px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .meta { display: flex; align-items: center; gap: 10px; font-size: 17px; margin-top: 8px; min-width: 0; color: var(--ink); }
   .meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .meta .ico { font-size: 22px; color: var(--cu-blue); }
-  .meta.when { font-weight: 700; }
-  .meta.where { color: var(--cu-blue); }
+  .meta .bub { width: 34px; height: 34px; flex: none; border-radius: 12px; display: grid; place-items: center; background: var(--card);
+               box-shadow: 0 3px 10px rgba(0, 48, 135, 0.08); color: var(--bright); font-size: 19px; }
+  .meta.when { font-weight: 700; color: var(--navy); }
   .tags { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .tag { background: var(--cu-blue); color: var(--navy); font-weight: 700; font-size: 12px;
-         padding: 3px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .credit { margin-top: 18px; font-size: 12px; color: rgba(185, 217, 235, 0.6); }
+  .tag { background: var(--cu-blue); color: var(--navy); font-weight: 700; font-size: 12px; padding: 4px 12px; border-radius: 999px;
+         text-transform: uppercase; letter-spacing: 0.06em; }
+  .credit { margin-top: 16px; font-size: 12px; color: var(--muted); }
 
   /* Best time */
   .best { display: flex; flex-direction: column; }
-  .best .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-top: 6px; }
-  .best h2 { font-size: 50px; display: flex; align-items: center; gap: 14px; }
-  .mood-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--sky); box-shadow: 0 0 0 6px rgba(108, 172, 228, 0.25); }
-  .mood-dot.quiet { background: #4ade80; box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.2); }
-  .mood-dot.busy { background: var(--accent-soft); box-shadow: 0 0 0 6px rgba(255, 179, 122, 0.22); }
-  .best .stat { text-align: right; font-size: 14px; color: var(--muted); line-height: 1.3; }
-  .best .stat b { display: block; font-size: 26px; color: var(--white); font-weight: 700; }
-  .times { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 16px; color: var(--cu-blue); }
-  .time { background: var(--white); color: var(--navy); border-radius: 12px; padding: 5px 14px; line-height: 1.2; text-align: center; }
-  .time b { display: block; font-size: 19px; }
-  .time small { font-size: 12px; font-weight: 600; color: #4a5b80; }
-  .chart { position: relative; margin-top: auto; }
-  .bars { display: grid; grid-template-columns: repeat(24, 1fr); gap: 5px; align-items: end; height: 122px;
-          border-bottom: 2px solid rgba(185, 217, 235, 0.3); }
-  .bars i { position: relative; display: block; border-radius: 4px 4px 0 0; background: #2f6fc0; min-height: 3px; }
-  .bars i.past { opacity: 0.4; }
-  .bars i.good { background: var(--cu-blue); }
-  .bars i.now { background: var(--white); }
-  .bars i.now::before { content: "Now"; position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
-                        font-size: 11px; font-weight: 700; font-style: normal; color: var(--navy); background: var(--white);
-                        padding: 1px 6px; border-radius: 6px; }
-  .bar-labels { display: grid; grid-template-columns: repeat(24, 1fr); gap: 5px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .best .head { display: flex; align-items: center; gap: 14px; }
+  .best .head .mini { width: 112px; height: 112px; flex: none; margin: -14px 0 -10px -8px; }
+  .best h2 { font-size: 40px; }
+  .best .stat2 { margin-left: auto; text-align: right; font-size: 13px; color: var(--muted); padding: 10px 16px; }
+  .best .stat2 b { display: block; font-size: 26px; color: var(--navy); }
+  .times { display: flex; gap: 10px; align-items: center; margin-top: 8px; font-size: 15px; color: var(--muted); }
+  .time { background: var(--white); color: var(--navy); border-radius: 14px; padding: 5px 14px; line-height: 1.2; text-align: center;
+          box-shadow: 0 3px 10px rgba(0, 48, 135, 0.1); }
+  .time b { display: block; font-size: 18px; }
+  .time small { font-size: 11px; font-weight: 600; color: var(--muted); }
+  .chart { margin-top: auto; padding: 26px 16px 8px; }
+  .bars { display: grid; grid-template-columns: repeat(24, 1fr); gap: 5px; align-items: end; height: 120px; }
+  .bars i { position: relative; display: block; border-radius: 7px 7px 3px 3px; background: #8fc3e6; min-height: 4px;
+            transform-origin: bottom; animation: grow 0.8s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+  .bars i.past { background: #cfe0ee; }
+  .bars i.good { background: var(--green); }
+  .bars i.now { background: var(--navy); }
+  .bars i.now::before { content: "Now"; position: absolute; bottom: calc(100% + 5px); left: 50%; transform: translateX(-50%);
+                        font-size: 11px; font-weight: 700; font-style: normal; color: var(--white); background: var(--navy);
+                        padding: 2px 7px; border-radius: 8px; }
+  @keyframes grow { from { transform: scaleY(0); } }
+  .bar-labels { display: grid; grid-template-columns: repeat(24, 1fr); gap: 5px; font-size: 11px; color: var(--muted); margin-top: 5px; }
   .bar-labels span { white-space: nowrap; }
+  .legend { display: flex; gap: 14px; font-size: 11px; color: var(--muted); margin-top: 6px; justify-content: flex-end; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
 
   /* Lyrics */
-  .lyrics { display: flex; flex-direction: column; }
-  .np { display: flex; align-items: center; gap: 20px; }
-  .disc { width: 92px; height: 92px; flex: none; border-radius: 50%; position: relative; animation: spin 6s linear infinite;
-          background: repeating-radial-gradient(circle, #0d0f18 0 2px, #1a1e2c 2px 4px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
-  .disc::after { content: ""; position: absolute; inset: 30px; border-radius: 50%; background: var(--cu-blue);
-                 box-shadow: inset 0 0 0 9px var(--sky); }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
-  .eq i { width: 3px; background: var(--cu-blue); animation: eq 0.9s ease-in-out infinite alternate; }
-  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; }
-  @keyframes eq { from { height: 3px; } to { height: 12px; } }
-  .np .title { font-family: var(--serif); font-size: 32px; font-weight: 600; line-height: 1.1; margin-top: 4px;
+  .lyrics { display: grid; grid-template-columns: 230px 1fr; gap: 18px; align-items: center; }
+  .lyrics .stage-blob { width: 230px; height: 300px; }
+  .lyrics .np { min-width: 0; display: flex; flex-direction: column; height: 100%; justify-content: center; }
+  .np .title { font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1.1; margin-top: 6px;
                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .np .artist { font-size: 17px; color: var(--cu-blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .np > div { min-width: 0; }
-  .lines { margin-top: 20px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
-  .lines p { font-family: var(--serif); margin: 0; line-height: 1.15; }
-  .lines .prev, .lines .next { font-size: 26px; color: rgba(255, 255, 255, 0.4);
-                               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .lines .current { font-size: 46px; font-weight: 600; color: var(--cu-blue); margin: 10px 0;
+  .np .artist { font-size: 16px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lines { margin: 18px 0; padding: 16px 20px; }
+  .lines p { margin: 0; line-height: 1.2; }
+  .lines .prev, .lines .next { font-size: 19px; color: #8aa1bf; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lines .current { font-size: 32px; font-weight: 700; color: var(--navy); margin: 8px 0;
                     display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-  .songbar { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
-  .songbar div { flex: 1; height: 5px; border-radius: 5px; background: rgba(185, 217, 235, 0.2); overflow: hidden; }
-  .songbar i { display: block; height: 100%; background: var(--cu-blue); }
+  .songbar { display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .songbar div { flex: 1; height: 8px; border-radius: 8px; background: #dce9f3; overflow: hidden; }
+  .songbar i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--sky), var(--bright)); }
 
-  .pagedots { position: absolute; bottom: 9px; left: 0; right: 0; text-align: center; line-height: 0; }
-  .pagedots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px; background: #3a4f80; transition: all 0.3s; }
-  .pagedots i.on { background: var(--cu-blue); width: 24px; border-radius: 8px; }
+  .pagedots { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; line-height: 0; }
+  .pagedots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px; background: #a9c6dd; transition: all 0.3s; }
+  .pagedots i.on { background: var(--navy); width: 24px; border-radius: 8px; }
   .banner { position: absolute; bottom: 0; left: 0; right: 0; height: 46px; display: flex; align-items: center; justify-content: center;
-            gap: 10px; background: var(--cu-blue); color: var(--navy); font-size: 19px; font-weight: 700; z-index: 3; }
-  .banner .ico { font-size: 22px; }
-  .banner b { font-variant-numeric: tabular-nums; }
+            gap: 10px; background: var(--navy); color: var(--white); font-size: 18px; font-weight: 700; z-index: 3; }
+  .banner svg.lionhead { width: 34px; height: 34px; }
+  .banner b { font-variant-numeric: tabular-nums; background: var(--white); color: var(--navy); border-radius: 8px; padding: 1px 8px; }
 
   /* Interruptions */
-  .overlay { position: absolute; inset: 0; display: none; z-index: 5; background: var(--navy-deep);
-             flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 24px; }
+  .overlay { position: absolute; inset: 0; display: none; z-index: 5; align-items: center; justify-content: center; padding: 24px 34px; }
   .overlay.show { display: flex; }
-  #hurry { border: 10px solid var(--accent); background: radial-gradient(circle at 50% 25%, #4a1f00 0%, var(--navy-deep) 62%); }
+  #hurry { border: 10px solid var(--accent); background-color: #ffe6d4; background-image: radial-gradient(circle at 25% 40%, #fff7f0 0%, #ffe6d4 55%, #ffd2b3 100%); gap: 14px; }
   #hurry.flash { animation: flash 0.7s ease-in-out 4; }
-  @keyframes flash { 50% { border-color: var(--navy-deep); background: #3a1800; } }
-  .bell { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); display: grid; place-items: center;
-          font-size: 34px; animation: ring 2.4s ease-in-out infinite; box-shadow: 0 0 0 10px rgba(199, 80, 0, 0.25); }
-  @keyframes ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(14deg); } 82% { transform: rotate(-12deg); }
-                    89% { transform: rotate(8deg); } 95% { transform: rotate(-4deg); } }
-  #hurry .kicker { color: var(--accent-soft); font-size: 16px; margin-top: 14px; justify-content: center; }
-  #hurry h1 { font-family: var(--serif); font-size: 56px; font-weight: 600; line-height: 1.05; margin: 6px 0 10px; }
-  #hurry .chip { font-size: 17px; }
-  .holdrow { display: flex; align-items: center; gap: 22px; margin-top: 18px; }
-  .ring { width: 118px; height: 118px; flex: none; }
-  .ring circle { fill: none; stroke-width: 16; }
-  .ring .track { stroke: #3a2a35; }
+  /* Only the border and a glow flash: animating the background would fade it see-through. */
+  @keyframes flash { 50% { border-color: #ffb37a; box-shadow: inset 0 0 60px 20px rgba(199, 80, 0, 0.35); } }
+  #hurry .who { width: 250px; height: 330px; flex: none; }
+  #hurry .content { flex: 1; min-width: 0; }
+  #hurry .kicker { color: var(--accent); font-size: 15px; }
+  #hurry h1 { font-size: 46px; font-weight: 700; line-height: 1.05; margin: 8px 0 12px; color: var(--navy); }
+  #hurry .chip { font-size: 15px; }
+  #hurry .chip .ico { color: var(--accent); }
+  .holdrow { display: flex; align-items: center; gap: 18px; margin-top: 18px; padding: 14px 18px; }
+  .ring { width: 104px; height: 104px; flex: none; }
+  .ring circle { fill: none; stroke-width: 18; }
+  .ring .track { stroke: #ffe1cc; }
   .ring .fill { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
                 transition: stroke-dashoffset 0.15s linear; }
-  .ring text { fill: var(--white); font: 700 52px var(--sans); text-anchor: middle; dominant-baseline: central; }
-  .hold-hint { display: flex; align-items: center; gap: 14px; max-width: 400px; text-align: left; font-size: 19px; line-height: 1.35; }
-  .hold-hint .ico { font-size: 44px; color: var(--accent-soft); stroke-width: 1.6; }
-  #no-hold { font-size: 20px; color: var(--cu-blue); margin-top: 18px; max-width: 520px; }
-  #thanks h1 { font-family: var(--serif); font-size: 72px; margin: 18px 0 4px; }
-  #thanks p { font-size: 22px; color: var(--cu-blue); margin: 0; }
-  .check { width: 112px; height: 112px; border-radius: 50%; background: var(--green); display: grid; place-items: center;
-           font-size: 64px; box-shadow: 0 0 0 14px rgba(34, 136, 72, 0.25); animation: pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
-  .check .ico { stroke-width: 3; }
-  @keyframes pop { from { transform: scale(0.4); opacity: 0; } }
-  #boot { background: radial-gradient(circle at 15% 0%, #0b3c9e 0%, var(--navy-deep) 55%, #001339 100%); }
-  #boot .brand { font-size: 64px; }
-  #boot p { color: var(--cu-blue); font-size: 20px; margin: 6px 0 0; }
+  .ring text { fill: var(--navy); font: 700 54px var(--sans); text-anchor: middle; dominant-baseline: central; }
+  #hold-hint { font-size: 17px; line-height: 1.35; color: var(--ink); }
+  #hold-hint b { color: var(--accent); }
+  #no-hold { font-size: 18px; color: var(--muted); margin-top: 18px; }
+  #thanks, #boot { flex-direction: column; text-align: center; background: radial-gradient(circle at 50% 35%, #ffffff 0%, #e6f2fa 55%, #cfe5f3 100%); }
+  #thanks .who, #boot .who { width: 260px; height: 270px; }
+  #thanks h1 { font-size: 56px; margin: 0 0 4px; color: var(--navy); }
+  #thanks p, #boot p { font-size: 19px; color: var(--muted); margin: 0; }
+  #boot .brand { font-size: 40px; justify-content: center; }
+
+  /* ---- Mascot animations ---- */
+  .lion .eyes { animation: blink 4.6s infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(0.1); } }
+  .bob { animation: bob 2.6s ease-in-out infinite; }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  .tail { animation: tail 1.8s ease-in-out infinite alternate; transform-origin: 138px 172px; }
+  @keyframes tail { from { transform: rotate(-10deg); } to { transform: rotate(16deg); } }
+  .arm-r { transform-origin: 136px 152px; transform: rotate(-14deg); }
+  .arm-wave { animation: wave 0.8s ease-in-out infinite alternate; }
+  @keyframes wave { from { transform: rotate(-110deg); } to { transform: rotate(-165deg); } }
+  .arm-up { animation: armup 1.3s ease-in-out infinite alternate; }
+  @keyframes armup { from { transform: rotate(-148deg); } to { transform: rotate(-166deg); } }
+  .sway { animation: sway 1.1s ease-in-out infinite alternate; transform-origin: 100px 200px; }
+  @keyframes sway { from { transform: rotate(-5deg); } to { transform: rotate(5deg); } }
+  .jump { animation: jump 1.2s ease-in-out infinite; transform-origin: 100px 205px; }
+  @keyframes jump { 0%, 70%, 100% { transform: translateY(0) scale(1, 1); } 20% { transform: translateY(0) scale(1.06, 0.94); }
+                    40% { transform: translateY(-26px) scale(0.96, 1.05); } 60% { transform: translateY(0) scale(1.05, 0.95); } }
+  .breathe { animation: breathe 3.2s ease-in-out infinite; transform-origin: 100px 205px; }
+  @keyframes breathe { 50% { transform: scale(1.03, 0.98); } }
+  .drop { animation: drop 0.9s linear infinite; }
+  @keyframes drop { 0% { transform: translateY(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(54px); opacity: 0; } }
+  .bubble { animation: rise 3.2s ease-in infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+  @keyframes rise { 0% { transform: translateY(0) scale(0.5); opacity: 0; } 20% { opacity: 0.95; }
+                    100% { transform: translateY(-80px) scale(1.15); opacity: 0; } }
+  .note { animation: note 2.8s ease-out infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+  @keyframes note { 0% { transform: translate(0, 0) rotate(-10deg); opacity: 0; } 20% { opacity: 1; }
+                    100% { transform: translate(18px, -70px) rotate(15deg); opacity: 0; } }
+  .heart { animation: heart 2.4s ease-out infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+  @keyframes heart { 0% { transform: translateY(0) scale(0.4); opacity: 0; } 25% { transform: translateY(-14px) scale(1); opacity: 1; }
+                     100% { transform: translateY(-80px) scale(0.9); opacity: 0; } }
+  .zzz { animation: zzz 3s ease-out infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+  @keyframes zzz { 0% { transform: translate(0, 0) scale(0.6); opacity: 0; } 25% { opacity: 1; }
+                   100% { transform: translate(24px, -50px) scale(1.2); opacity: 0; } }
+  .twinkle { animation: twinkle 1.6s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+  @keyframes twinkle { 0%, 100% { transform: scale(0.4) rotate(0); opacity: 0.2; } 50% { transform: scale(1) rotate(25deg); opacity: 1; } }
+  .confetti { animation: fall 3s linear infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+  @keyframes fall { 0% { transform: translateY(-20px) rotate(0); opacity: 0; } 10% { opacity: 1; }
+                    100% { transform: translateY(250px) rotate(380deg); opacity: 0; } }
+  .shake { animation: shake 1.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 60%; }
+  @keyframes shake { 0%, 55%, 100% { transform: rotate(0); } 60% { transform: rotate(-14deg); } 65% { transform: rotate(14deg); }
+                     70% { transform: rotate(-11deg); } 75% { transform: rotate(11deg); } 80% { transform: rotate(-6deg); } 85% { transform: rotate(6deg); } }
+  .hand-spin { animation: spin 5s linear infinite; transform-box: view-box; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .sweat { animation: sweat 1.6s ease-in infinite; transform-box: fill-box; transform-origin: top; }
+  @keyframes sweat { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(16px) scale(1); opacity: 0; } }
+  .wave-line { animation: waveline 2s linear infinite; }
+  @keyframes waveline { to { transform: translateX(30px); } }
 </style>
 </head>
 <body>
 <svg width="0" height="0" style="position: absolute" aria-hidden="true">
-  <symbol id="i-shower" viewBox="0 0 24 24"><path d="M4 21V7a3 3 0 0 1 3-3h2a3 3 0 0 1 3 3v1"/><path d="M8 8h8l1.5 3h-11z"/>
-    <path d="M8 14.5v.5M12 14.5v.5M16 14.5v.5M7 18.5v.5M11 18.5v.5M15 18.5v.5M18 18.5v.5"/></symbol>
   <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></symbol>
   <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
   <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
-  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6.5 3 8.5 3 8.5H3s3-2 3-8.5"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
-  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V3.5a1.5 1.5 0 0 1 3 0V11M14 10.5V5a1.5 1.5 0 0 1 3 0v6.5M17 9a1.5 1.5 0 0 1 3 0v5a8 8 0 0 1-8 8h-.5a7 7 0 0 1-5.4-2.6L3.3 16a1.7 1.7 0 0 1 2.6-2.2L8 16"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s-7 7.6-7 12a7 7 0 0 0 14 0c0-4.4-7-12-7-12z"/></symbol>
   <symbol id="i-sensor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></symbol>
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.4a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+  <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><circle cx="6" cy="10.5" r="2.2"/><circle cx="10" cy="7" r="2.2"/><circle cx="14" cy="7" r="2.2"/><circle cx="18" cy="10.5" r="2.2"/></symbol>
 </svg>
 
 <div id="stage">
+  <div id="bubbles"></div>
   <div class="top">
-    <span class="brand">NextUp</span>
+    <span class="brand"><span id="brand-lion"></span>NextUp</span>
     <span class="sep"></span>
     <span class="name" id="name">Stall</span>
     <span class="state" id="top-state"></span>
@@ -240,94 +296,282 @@
   </div>
 
   <section class="page status" id="page-status">
-    <div class="visual">
-      <div id="st-free"><span class="ripple"></span><span class="ripple two"></span>
-        <div class="free-badge"><svg class="ico"><use href="#i-shower"/></svg></div></div>
-      <div id="st-busy" hidden>
-        <svg class="timer" id="timer" viewBox="0 0 236 236"><circle class="track" cx="118" cy="118" r="100"/>
-          <circle class="fill" id="timer-fill" cx="118" cy="118" r="100" stroke-dasharray="628.32" stroke-dashoffset="628.32"/></svg>
-        <div class="timer-text"><b id="timer-time">0:00</b><span>in the shower</span></div>
-      </div>
-    </div>
+    <div class="stage-blob" id="st-scene"></div>
     <div>
       <span class="pill" id="pill">…</span>
       <h2 id="big"></h2>
       <div class="sub" id="sub"></div>
+      <div id="st-busy" hidden>
+        <div class="stats">
+          <div class="card stat" id="stat-time"><span class="badge-ico"><svg class="ico"><use href="#i-clock"/></svg></span>
+            <div><div class="big" id="timer-time">0:00</div><div class="lbl">in the shower</div></div></div>
+          <div class="card stat"><svg class="drop-meter" viewBox="0 0 60 76" aria-hidden="true">
+              <defs><clipPath id="dropclip"><path d="M30 3C30 3 5 33 5 50a25 25 0 0 0 50 0C55 33 30 3 30 3z"/></clipPath></defs>
+              <g clip-path="url(#dropclip)"><rect width="60" height="76" fill="#e4f1fa"/>
+                <g id="water-level" style="transform: translateY(70px); transition: transform 1s linear">
+                  <path class="wave-line" d="M-60 4q7.5-5 15 0t15 0t15 0t15 0t15 0t15 0t15 0t15 0V90H-60z" fill="#6CACE4"/></g></g>
+              <path d="M30 3C30 3 5 33 5 50a25 25 0 0 0 50 0C55 33 30 3 30 3z" fill="none" stroke="#0077C8" stroke-width="3"/>
+              <ellipse cx="20" cy="46" rx="4" ry="7" fill="#fff" opacity="0.7"/></svg>
+            <div><div class="big" id="water-gal">0 gal</div><div class="lbl" id="water-l">≈ 0 L of water</div></div></div>
+        </div>
+        <div class="card avgbar" id="avgbar"><span>Average shower</span><div class="track"><div class="fill" id="avg-fill"></div></div><b id="avg-min"></b></div>
+      </div>
       <div class="queue" id="queue"></div>
-      <div class="chips" id="status-chips"></div>
+      <div class="chips free-hint" id="status-chips"></div>
     </div>
   </section>
 
   <section class="page event" id="page-event">
-    <div class="photo"><img id="ev-bg" class="backdrop" alt="" aria-hidden="true"><img id="ev-img" alt=""><span class="badge" id="ev-badge" hidden>Free food</span></div>
+    <div class="polaroid">
+      <span class="tape"></span>
+      <div class="photo"><img id="ev-bg" class="backdrop" alt="" aria-hidden="true"><img id="ev-img" alt=""><span class="badge" id="ev-badge" hidden>Free food</span></div>
+      <div class="caption">on campus soon!</div>
+      <div class="peek" id="ev-lion"></div>
+    </div>
     <div class="text">
       <div class="kicker"><svg class="ico"><use href="#i-sparkle"/></svg>On campus</div>
       <h2 id="ev-title"></h2>
-      <div class="meta when"><svg class="ico"><use href="#i-calendar"/></svg><span id="ev-when"></span></div>
-      <div class="meta where"><svg class="ico"><use href="#i-pin"/></svg><span id="ev-where"></span></div>
+      <div class="meta when"><span class="bub"><svg class="ico"><use href="#i-calendar"/></svg></span><span id="ev-when"></span></div>
+      <div class="meta where"><span class="bub"><svg class="ico"><use href="#i-pin"/></svg></span><span id="ev-where"></span></div>
       <div class="tags" id="ev-tags"></div>
-      <div class="credit">Columbia University Events</div>
+      <div class="credit">From Columbia University Events</div>
     </div>
   </section>
 
   <section class="page best" id="page-best">
-    <div class="kicker"><svg class="ico"><use href="#i-clock"/></svg>Best time to shower</div>
     <div class="head">
-      <h2><span class="mood-dot" id="mood-dot"></span><span id="best-title"></span></h2>
-      <div class="stat" id="best-stat"></div>
+      <div class="mini" id="best-lion"></div>
+      <div>
+        <div class="kicker"><svg class="ico"><use href="#i-clock"/></svg>Best time to shower</div>
+        <h2 id="best-title"></h2>
+      </div>
+      <div class="card stat2" id="best-stat"></div>
     </div>
     <div class="times" id="best-chips"></div>
-    <div class="chart"><div class="bars" id="best-bars"></div><div class="bar-labels" id="best-labels"></div></div>
+    <div class="card chart">
+      <div class="bars" id="best-bars"></div><div class="bar-labels" id="best-labels"></div>
+      <div class="legend"><span><i style="background: var(--navy)"></i>now</span><span><i style="background: var(--green)"></i>quieter</span><span><i style="background: #8fc3e6"></i>later today</span></div>
+    </div>
   </section>
 
   <section class="page lyrics" id="page-lyrics">
+    <div class="stage-blob" id="ly-scene"></div>
     <div class="np">
-      <div class="disc"></div>
-      <div>
-        <div class="kicker"><span class="eq"><i></i><i></i><i></i></span>Now playing</div>
-        <div class="title" id="ly-title"></div>
-        <div class="artist" id="ly-artist"></div>
+      <div class="kicker"><svg class="ico"><use href="#i-note"/></svg>Now playing</div>
+      <div class="title" id="ly-title"></div>
+      <div class="artist" id="ly-artist"></div>
+      <div class="card lines">
+        <p class="prev" id="ly-prev"></p>
+        <p class="current" id="ly-current"></p>
+        <p class="next" id="ly-next"></p>
       </div>
+      <div class="songbar"><span id="ly-pos">0:00</span><div><i id="ly-bar"></i></div><span id="ly-dur"></span></div>
     </div>
-    <div class="lines">
-      <p class="prev" id="ly-prev"></p>
-      <p class="current" id="ly-current"></p>
-      <p class="next" id="ly-next"></p>
-    </div>
-    <div class="songbar"><span id="ly-pos">0:00</span><div><i id="ly-bar"></i></div><span id="ly-dur"></span></div>
   </section>
 
   <div class="pagedots" id="pagedots"></div>
-  <div class="banner" id="reserved" hidden><svg class="ico"><use href="#i-clock"/></svg><span>Held for the next person in line</span><b id="reserved-left"></b></div>
+  <div class="banner" id="reserved" hidden><span id="reserved-lion"></span><span>Held for the next person in line</span><b id="reserved-left"></b></div>
 
   <div class="overlay" id="hurry">
-    <div class="bell"><svg class="ico"><use href="#i-bell"/></svg></div>
-    <div class="kicker">Someone's waiting</div>
-    <h1>Please start wrapping up</h1>
-    <span class="chip" id="hurry-line" hidden><svg class="ico solid"><use href="#i-person"/></svg><b></b></span>
-    <div class="holdrow" id="holdrow">
-      <svg class="ring" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
-        <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/>
-        <text x="100" y="100" id="ring-secs">5</text></svg>
-      <div class="hold-hint"><svg class="ico"><use href="#i-hand"/></svg><span id="hold-hint"></span></div>
+    <div class="who" id="hurry-lion"></div>
+    <div class="content">
+      <div class="kicker">Someone's waiting</div>
+      <h1>Time to start wrapping up!</h1>
+      <span class="chip" id="hurry-line" hidden><svg class="ico solid"><use href="#i-person"/></svg><b></b></span>
+      <div class="card holdrow" id="holdrow">
+        <svg class="ring" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
+          <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/>
+          <text x="100" y="100" id="ring-secs">5</text></svg>
+        <div id="hold-hint"></div>
+      </div>
+      <div id="no-hold" hidden>They've been told this is on your screen. Thanks!</div>
     </div>
-    <div id="no-hold" hidden>They've been told this is on your screen. Thanks!</div>
   </div>
-  <div class="overlay" id="thanks"><div class="check"><svg class="ico"><use href="#i-check"/></svg></div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
-  <div class="overlay show" id="boot"><span class="brand">NextUp</span><p id="boot-text">Starting the stall screen…</p></div>
+  <div class="overlay" id="thanks"><div class="who" id="thanks-lion"></div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
+  <div class="overlay show" id="boot"><div class="who" id="boot-lion"></div><span class="brand">NextUp</span><p id="boot-text">Waking up the stall screen…</p></div>
 </div>
 
 <script>
+  // ---------------------------------------------------------------------------------------
+  // The mascot: an original lion cub with a Columbia Blue mane, drawn in a 200 × 210 box.
+  // Every string below is fixed markup (no feed text), so building it with innerHTML is safe.
+  // ---------------------------------------------------------------------------------------
+  const C = { fur: '#F6C97E', furDark: '#E5AA5A', cream: '#FFF1D6', mane: '#8FC3E6', maneDark: '#5E9FD0',
+              ink: '#1B2A4A', nose: '#6B4434', blush: '#F6A193', tongue: '#D8575C', cap: '#FFB9CB', capDot: '#ffffff' }
+
+  function mane() {
+    let s = `<circle cx="100" cy="84" r="54" fill="${C.mane}"/>`
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2, x = 100 + Math.cos(a) * 52, y = 84 + Math.sin(a) * 52
+      s += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="17" fill="${C.mane}"/>`
+    }
+    return s + `<circle cx="100" cy="86" r="50" fill="${C.maneDark}" opacity="0.28"/>`
+  }
+
+  const EYES = {
+    open: `<g class="eyes"><ellipse cx="83" cy="86" rx="6.5" ry="8" fill="${C.ink}"/><ellipse cx="117" cy="86" rx="6.5" ry="8" fill="${C.ink}"/>
+           <circle cx="85.5" cy="82.5" r="2.4" fill="#fff"/><circle cx="119.5" cy="82.5" r="2.4" fill="#fff"/></g>`,
+    happy: `<path d="M76 88q7-9 14 0M110 88q7-9 14 0" stroke="${C.ink}" stroke-width="3.6" fill="none" stroke-linecap="round"/>`,
+    closed: `<path d="M76 86q7 7 14 0M110 86q7 7 14 0" stroke="${C.ink}" stroke-width="3.4" fill="none" stroke-linecap="round"/>`,
+    wide: `<g class="eyes"><circle cx="83" cy="85" r="9" fill="#fff"/><circle cx="117" cy="85" r="9" fill="#fff"/>
+           <circle cx="83" cy="86" r="5.5" fill="${C.ink}"/><circle cx="117" cy="86" r="5.5" fill="${C.ink}"/>
+           <circle cx="85" cy="84" r="1.8" fill="#fff"/><circle cx="119" cy="84" r="1.8" fill="#fff"/></g>`,
+  }
+  const MOUTH = {
+    smile: `<path d="M100 104q-3 6-9 4M100 104q3 6 9 4" stroke="${C.nose}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`,
+    open: `<path d="M100 104q-3 6-9 4M100 104q3 6 9 4" stroke="${C.nose}" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+           <ellipse cx="100" cy="113" rx="5.5" ry="6.5" fill="${C.tongue}"/>`,
+    grin: `<path d="M87 106Q100 124 113 106Z" fill="${C.tongue}" stroke="${C.nose}" stroke-width="2" stroke-linejoin="round"/>`,
+    o: `<ellipse cx="100" cy="112" rx="4.5" ry="5.5" fill="${C.nose}"/>`,
+  }
+  const HATS = {
+    none: '',
+    cap: `<path d="M46 72C48 22 152 22 154 72Z" fill="${C.cap}"/>
+          ${[52, 64, 76, 88, 100, 112, 124, 136, 148].map((x) => `<circle cx="${x}" cy="72" r="7" fill="${C.cap}"/>`).join('')}
+          <circle cx="78" cy="44" r="3" fill="${C.capDot}"/><circle cx="104" cy="36" r="3" fill="${C.capDot}"/><circle cx="126" cy="50" r="3" fill="${C.capDot}"/>`,
+    phones: `<path d="M50 88C48 26 152 26 150 88" stroke="${C.ink}" stroke-width="8" fill="none" stroke-linecap="round"/>
+             <rect x="38" y="72" width="22" height="34" rx="10" fill="#003087"/><rect x="140" y="72" width="22" height="34" rx="10" fill="#003087"/>
+             <rect x="42" y="80" width="5" height="18" rx="2.5" fill="${C.mane}"/><rect x="153" y="80" width="5" height="18" rx="2.5" fill="${C.mane}"/>`,
+    party: `<path d="M84 40L100 2L116 40Z" fill="#C75000"/><path d="M90 26L110 26M94 16L106 16" stroke="#fff" stroke-width="3"/>
+            <circle cx="100" cy="3" r="6" fill="#fff"/>`,
+  }
+
+  // One lion. arm: 'down' | 'wave' | 'up'; anim: a class on the whole lion (bob, sway, jump, breathe).
+  function lion({ eyes = 'open', mouth = 'smile', hat = 'none', arm = 'down', anim = 'bob', blush = true, extra = '' } = {}) {
+    const armClass = arm === 'wave' ? 'arm-wave' : arm === 'up' ? 'arm-up' : ''
+    return `<g class="lion"><g class="${anim}">
+      <g class="tail"><path d="M138 172C168 170 178 146 166 128" stroke="${C.fur}" stroke-width="8" fill="none" stroke-linecap="round"/>
+        <circle cx="166" cy="124" r="10" fill="${C.mane}"/></g>
+      <ellipse cx="100" cy="166" rx="41" ry="33" fill="${C.fur}"/>
+      <ellipse cx="100" cy="171" rx="25" ry="21" fill="${C.cream}"/>
+      <ellipse cx="80" cy="196" rx="15" ry="8.5" fill="${C.furDark}"/><ellipse cx="120" cy="196" rx="15" ry="8.5" fill="${C.furDark}"/>
+      <ellipse cx="66" cy="168" rx="10.5" ry="20" fill="${C.fur}" stroke="${C.furDark}" stroke-width="2" transform="rotate(16 66 168)"/>
+      ${mane()}
+      <circle cx="66" cy="50" r="14" fill="${C.fur}"/><circle cx="66" cy="50" r="7" fill="${C.blush}"/>
+      <circle cx="134" cy="50" r="14" fill="${C.fur}"/><circle cx="134" cy="50" r="7" fill="${C.blush}"/>
+      <circle cx="100" cy="88" r="44" fill="${C.fur}"/>
+      <ellipse cx="100" cy="106" rx="22" ry="15" fill="${C.cream}"/>
+      ${blush ? `<ellipse cx="70" cy="103" rx="8" ry="5" fill="${C.blush}" opacity="0.75"/><ellipse cx="130" cy="103" rx="8" ry="5" fill="${C.blush}" opacity="0.75"/>` : ''}
+      ${EYES[eyes]}
+      <path d="M93 97Q100 94 107 97Q103 104 100 104Q97 104 93 97Z" fill="${C.nose}"/>
+      ${MOUTH[mouth]}
+      ${HATS[hat]}
+      <g class="arm-r ${armClass}"><ellipse cx="136" cy="173" rx="11" ry="23" fill="${C.fur}" stroke="${C.furDark}" stroke-width="2"/>
+        <circle cx="136" cy="190" r="7" fill="${C.cream}"/><circle cx="132" cy="185" r="2" fill="${C.furDark}"/>
+        <circle cx="136" cy="184" r="2" fill="${C.furDark}"/><circle cx="140" cy="185" r="2" fill="${C.furDark}"/></g>
+      ${extra}
+    </g></g>`
+  }
+
+  // Props and effects -----------------------------------------------------------------------
+  // (Animated elements sit inside a positioned group: a CSS animation's transform replaces an SVG transform attribute.)
+  const heartPath = (x, y, s, d, color = '#F27A8C') =>
+    `<g transform="translate(${x} ${y}) scale(${s})"><path class="heart" style="animation-delay:${d}s" fill="${color}"
+       d="M0 4C-4-4-14 0-10 8L0 17L10 8C14 0 4-4 0 4Z"/></g>`
+  const sparkle = (x, y, s, d, color = '#0077C8') =>
+    `<g transform="translate(${x} ${y}) scale(${s})"><path class="twinkle" style="animation-delay:${d}s" fill="${color}"
+       d="M0-10L2.5-2.5L10 0L2.5 2.5L0 10L-2.5 2.5L-10 0L-2.5-2.5Z"/></g>`
+  const note = (x, y, d) =>
+    `<g class="note" style="animation-delay:${d}s"><g transform="translate(${x} ${y})" fill="#003087">
+       <ellipse cx="0" cy="12" rx="6" ry="4.5" transform="rotate(-20 0 12)"/><rect x="4" y="-10" width="2.6" height="22"/>
+       <path d="M6.6-10q9 3 8 12" stroke="#003087" stroke-width="2.6" fill="none"/></g></g>`
+  const bubble = (x, y, r, d) =>
+    `<circle class="bubble" style="animation-delay:${d}s" cx="${x}" cy="${y}" r="${r}" fill="rgba(255,255,255,0.75)" stroke="#8FC3E6" stroke-width="2"/>`
+  const shadow = (cx, cy, rx) => `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${rx / 6}" fill="#003087" opacity="0.1"/>`
+  const place = (x, y, s, body) => `<g transform="translate(${x} ${y}) scale(${s})">${body}</g>`
+  const svg = (w, h, body) => `<svg class="scene" viewBox="0 0 ${w} ${h}" aria-hidden="true">${body}</svg>`
+
+  const SCENES = {
+    // Showering: shower head, falling drops, bubbles, shower cap.
+    shower: () => svg(300, 352, `
+      ${shadow(150, 330, 80)}
+      <path d="M40 0V30H160" stroke="#9db7cf" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M134 30H186L198 50H122Z" fill="#7d9fbf"/><rect x="128" y="50" width="64" height="5" rx="2.5" fill="#5e84a8"/>
+      ${[130, 142, 154, 166, 178, 190, 136, 160, 184].map((x, i) =>
+        `<line class="drop" style="animation-delay:${(i * 0.13).toFixed(2)}s" x1="${x}" y1="${62 + (i % 3) * 6}" x2="${x - 3}" y2="${74 + (i % 3) * 6}" stroke="#4f9fdc" stroke-width="3.5" stroke-linecap="round"/>`).join('')}
+      ${place(50, 118, 1, lion({ eyes: 'happy', mouth: 'open', hat: 'cap' }))}
+      ${bubble(60, 290, 9, 0)}${bubble(250, 270, 7, 0.9)}${bubble(80, 230, 6, 1.7)}${bubble(240, 210, 11, 2.3)}${bubble(40, 180, 5, 1.2)}
+      ${note(250, 130, 0.4)}`),
+    // Free: waving hello, sparkles.
+    wave: () => svg(300, 352, `
+      ${shadow(150, 326, 78)}
+      ${place(50, 110, 1, lion({ arm: 'wave', mouth: 'grin' }))}
+      ${sparkle(60, 120, 1.2, 0)}${sparkle(250, 100, 1, 0.6)}${sparkle(262, 230, 0.8, 1.1, '#228848')}${sparkle(40, 250, 0.9, 0.3, '#228848')}
+      <g transform="translate(212 74)"><rect x="-4" y="-22" width="78" height="34" rx="17" fill="#228848"/>
+        <text x="35" y="0" text-anchor="middle" dominant-baseline="central" font-family="Montserrat, Arial" font-weight="700" font-size="17" fill="#fff">Hi!</text>
+        <path d="M6 10L-6 24L18 12Z" fill="#228848"/></g>`),
+    // Events: party hat, confetti, little pennant.
+    party: () => svg(200, 215, `
+      ${[[20, 0], [60, 0.8], [110, 1.5], [150, 0.4], [180, 2.1], [90, 2.6]].map(([x, d], i) =>
+        `<rect class="confetti" style="animation-delay:${d}s" x="${x}" y="-10" width="7" height="12" rx="2" fill="${['#C75000', '#228848', '#0077C8', '#F27A8C'][i % 4]}"/>`).join('')}
+      ${lion({ hat: 'party', arm: 'wave', mouth: 'grin', eyes: 'happy' })}`),
+    // Best time: a clock that ticks; the face follows how busy it is.
+    clock: (mood) => svg(210, 215, `
+      ${lion({ eyes: mood === 'busy' ? 'wide' : mood === 'quiet' ? 'happy' : 'open', mouth: mood === 'busy' ? 'o' : 'smile', anim: 'breathe',
+               extra: mood === 'busy' ? `<path class="sweat" d="M146 64q6 9 0 13q-6-4 0-13Z" fill="#6CACE4"/>` : '' })}
+      <g transform="translate(168 150)"><circle r="30" fill="#fff" stroke="#003087" stroke-width="5"/>
+        ${[0, 90, 180, 270].map((a) => `<rect x="-2" y="-25" width="4" height="7" rx="2" fill="#003087" transform="rotate(${a})"/>`).join('')}
+        <rect x="-2.5" y="-16" width="5" height="18" rx="2.5" fill="#003087" transform="rotate(40)"/>
+        <rect class="hand-spin" x="-1.5" y="-22" width="3" height="24" rx="1.5" fill="#C75000"/>
+        <circle r="4" fill="#003087"/></g>
+      ${mood === 'quiet' ? sparkle(30, 40, 0.9, 0) + sparkle(190, 60, 0.7, 0.8) : ''}`),
+    // Music: headphones, dancing, notes floating up.
+    music: () => svg(230, 300, `
+      ${shadow(115, 288, 70)}
+      ${place(15, 78, 1, lion({ hat: 'phones', eyes: 'happy', mouth: 'open', anim: 'sway' }))}
+      ${note(30, 90, 0)}${note(180, 70, 0.9)}${note(200, 150, 1.8)}${note(20, 170, 1.3)}`),
+    // Hurry: an alarm clock that rings, and a paw up to show the hand-hold.
+    alarm: () => svg(250, 330, `
+      ${shadow(125, 310, 80)}
+      ${place(25, 92, 1.05, lion({ eyes: 'wide', mouth: 'o', arm: 'up', anim: 'bob' }))}
+      <g class="shake"><g transform="translate(58 300)">
+        <circle cx="-17" cy="-36" r="9" fill="#C75000"/><circle cx="17" cy="-36" r="9" fill="#C75000"/>
+        <circle r="30" cy="-12" fill="#fff" stroke="#C75000" stroke-width="6"/>
+        <path d="M0-12V-30M0-12L11-5" stroke="#003087" stroke-width="4" stroke-linecap="round"/>
+        <path d="M-20 14L-26 22M20 14L26 22" stroke="#C75000" stroke-width="5" stroke-linecap="round"/></g></g>
+      <path d="M20 250q-10-14 0-28M8 256q-16-22 0-42" stroke="#C75000" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
+      <g transform="translate(200 80)">${sparkle(0, 0, 1.1, 0, '#C75000')}</g>`),
+    // Thanks: jumping for joy, hearts.
+    thanks: () => svg(260, 270, `
+      ${shadow(130, 258, 70)}
+      ${place(30, 45, 1, lion({ eyes: 'happy', mouth: 'grin', arm: 'up', anim: 'jump' }))}
+      ${heartPath(40, 110, 1.1, 0)}${heartPath(220, 90, 0.9, 0.7)}${heartPath(200, 170, 1, 1.4)}${heartPath(60, 180, 0.8, 1.9, '#C75000')}`),
+    // Start-up: asleep, z z z.
+    sleep: () => svg(260, 270, `
+      ${shadow(130, 258, 70)}
+      ${place(30, 45, 1, lion({ eyes: 'closed', mouth: 'smile', anim: 'breathe' }))}
+      ${[0, 1, 2].map((i) => `<text class="zzz" style="animation-delay:${i}s" x="${178 + i * 4}" y="${84 - i * 4}" font-family="Montserrat, Arial" font-weight="700" font-size="${18 + i * 4}" fill="#003087">z</text>`).join('')}`),
+    head: () => `<svg viewBox="40 22 120 124" aria-hidden="true" class="lionhead">${lion({ anim: '', mouth: 'smile' })}</svg>`,
+    headWait: () => `<svg viewBox="40 22 120 124" aria-hidden="true">${lion({ anim: '', mouth: 'o', eyes: 'open' })}</svg>`,
+  }
+
+  // ---------------------------------------------------------------------------------------
   const $ = (id) => document.getElementById(id)
   let state = null, lastChime = null, audio = null, closedAt = 0
   let pageIndex = 0, pageStarted = Date.now()
+  const FORCED = new URLSearchParams(location.search).get('page')  // ?page=best: stay on one page (screenshots)
   const drawn = {}  // what was last drawn into the slower-changing parts, to skip redrawing them
   const MOOD = { quiet: 'Quiet right now', moderate: 'Getting busy', busy: 'Busy right now' }
-  const TIMER = 2 * Math.PI * 100
+  const LITERS_PER_GALLON = 3.785
 
   function fit() { document.documentElement.style.setProperty('--s', Math.min(innerWidth / 800, innerHeight / 480)) }
   addEventListener('resize', fit)
   fit()
+
+  // Static scenes, drawn once.
+  $('brand-lion').innerHTML = SCENES.head()
+  $('reserved-lion').innerHTML = SCENES.head()
+  $('ev-lion').innerHTML = SCENES.party()
+  $('ly-scene').innerHTML = SCENES.music()
+  $('hurry-lion').innerHTML = SCENES.alarm()
+  $('thanks-lion').innerHTML = SCENES.thanks()
+  $('boot-lion').innerHTML = SCENES.sleep()
+  $('bubbles').replaceChildren(...[[40, 26, 14], [150, 18, 20], [330, 30, 9], [520, 22, 16], [640, 34, 11], [740, 16, 22]].map(([x, s, secs], i) => {
+    const b = document.createElement('span')
+    b.className = 'bg-bubble'
+    Object.assign(b.style, { left: `${x}px`, width: `${s}px`, height: `${s}px`, animationDuration: `${secs}s`, animationDelay: `${-i * 3.1}s` })
+    return b
+  }))
 
   function chime() {  // only if the Pi has an audio output; the flashing border is the main signal
     try {
@@ -353,14 +597,15 @@
   const people = (n) => (n === 1 ? '1 person' : `${n} people`)
   const hourLabel = (h) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`
   const clock = (s) => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
+  const gallons = (g) => (g < 10 ? g.toFixed(1) : String(Math.round(g)))
   const el = (tag, props) => Object.assign(document.createElement(tag), props)
   function icon(name, cls = '') {
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
-    svg.setAttribute('class', `ico ${cls}`)
+    const svgEl = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svgEl.setAttribute('class', `ico ${cls}`)
     const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
     use.setAttribute('href', `#i-${name}`)
-    svg.append(use)
-    return svg
+    svgEl.append(use)
+    return svgEl
   }
   // A chip with an icon, a label and a bold value; feed text always goes in as text, never HTML.
   function chip(name, label, value) {
@@ -384,6 +629,12 @@
     return (Date.now() + (state.clock_offset_ms || 0) - new Date(np.started_at).getTime()) / 1000
   }
 
+  // Water: minutes with the water on × the room's flow rate (settings.water_gpm, 2.5 by default).
+  function water(secs) {
+    const gpm = state.insights?.water?.gpm || 2.5, gal = (secs / 60) * gpm
+    return { gpm, gal, liters: gal * LITERS_PER_GALLON }
+  }
+
   function pages() {
     const p = state.pages || {}, free = state.stall_state === 'free'
     const list = [{ kind: 'status', secs: p.status_s || 10 }]
@@ -397,34 +648,45 @@
 
   function showStatus(now) {
     const free = state.stall_state === 'free', n = state.waiting || 0
-    $('st-free').hidden = !free
+    once('st-scene', free ? 'free' : 'busy', () => { $('st-scene').innerHTML = free ? SCENES.wave() : SCENES.shower() })
     $('st-busy').hidden = free
     $('pill').textContent = free ? 'Free' : 'In use'
     $('pill').className = 'pill ' + (free ? 'free' : 'in_use')
     const avg = state.insights?.stats?.avg_shower_minutes || 15
     if (free) {
-      $('big').textContent = 'Step in whenever you like'
+      $('big').textContent = n ? 'Free, and you\'re next!' : 'It\'s free. Hop in!'
       $('sub').textContent = n ? `${people(n)} in line` : 'Nobody in line'
     } else {
-      const secs = state.since ? (now - new Date(state.since)) / 1000 : 0
+      const secs = state.since ? (now - new Date(state.since)) / 1000 : 0, w = water(secs), over = n > 0 && secs / 60 >= avg
       $('timer-time').textContent = clock(secs)
-      $('timer-fill').style.strokeDashoffset = String(TIMER * (1 - Math.min(1, secs / 60 / avg)))
-      $('timer').classList.toggle('over', n > 0 && secs / 60 >= avg)
-      $('big').textContent = n ? `${people(n)} waiting` : 'Take your time'
-      $('sub').textContent = n ? 'Please keep it short.' : 'Nobody in line right now.'
+      $('stat-time').classList.toggle('over', over)
+      $('water-gal').textContent = `${gallons(w.gal)} gal`
+      $('water-l').textContent = `≈ ${Math.round(w.liters)} L of water`
+      $('water-level').style.transform = `translateY(${(1 - Math.min(1, w.gal / (avg * w.gpm))) * 70}px)`
+      $('avg-fill').style.width = `${Math.min(100, (secs / 60 / avg) * 100)}%`
+      $('avgbar').classList.toggle('over', over)
+      $('avg-min').textContent = `${Math.round(avg)} min`
+      $('big').textContent = n ? `${people(n)} waiting` : 'Enjoy your shower!'
+      $('sub').textContent = n ? 'Please keep it short.' : 'Nobody\'s waiting. Take your time.'
     }
-    once('queue', n, () => {
-      const q = $('queue'), shown = Math.min(n, 6)
-      q.className = 'queue' + (n ? '' : ' empty')
-      q.replaceChildren(...(n ? Array.from({ length: shown }, () => icon('person', 'solid')) : [icon('person')]))
+    once('queue', `${free}/${n}`, () => {
+      const q = $('queue'), shown = Math.min(n, 7)
+      if (!n) {
+        q.replaceChildren(free ? '' : el('span', { className: 'none', textContent: '' }))
+        return
+      }
+      q.replaceChildren(...Array.from({ length: shown }, () => {
+        const span = el('span')
+        span.innerHTML = SCENES.headWait()  // fixed markup
+        return span.firstChild
+      }))
       if (n > shown) q.append(el('span', { className: 'more', textContent: `+${n - shown}` }))
     })
     const best = state.insights?.best_times?.[0], playing = music()?.now_playing
     const chips = []
     if (playing) chips.push(chip('note', '', playing.artist ? `${playing.title} · ${playing.artist}` : playing.title))
-    if (!free) chips.push(chip('clock', 'Average shower ', `${Math.round(avg)} min`))
-    if (best && (free || !playing)) chips.push(chip('sparkle', 'Quieter at ', best.label))
-    once('status-chips', JSON.stringify([free, playing?.title, best?.label, Math.round(avg)]), () => $('status-chips').replaceChildren(...chips))
+    if (free && best) chips.push(chip('sparkle', 'Quieter at ', best.label))
+    once('status-chips', JSON.stringify([free, playing?.title, best?.label]), () => $('status-chips').replaceChildren(...chips))
   }
 
   function showEvent(e) {
@@ -441,12 +703,13 @@
   function showBest(now) {
     const ins = state.insights, mood = ins.now?.mood || 'moderate'
     $('best-title').textContent = MOOD[mood] || 'Getting busy'
-    $('mood-dot').className = `mood-dot ${mood}`
+    once('best-lion', mood, () => { $('best-lion').innerHTML = SCENES.clock(mood) })
     const stats = ins.stats || {}, wait = ins.now?.wait_minutes
     once('best-stat', JSON.stringify([stats.showers_today, wait, state.waiting]), () => {
       $('best-stat').replaceChildren()
       if (state.waiting && wait) $('best-stat').append(el('b', { textContent: `~${Math.round(wait)} min` }), 'wait for a stall')
       else if (stats.showers_today) $('best-stat').append(el('b', { textContent: stats.showers_today }), 'showers today')
+      $('best-stat').hidden = !$('best-stat').childNodes.length
     })
     const minute = Math.floor(now / 60000)
     once('best-chips', JSON.stringify([ins.best_times, minute]), () => {
@@ -461,10 +724,11 @@
     const good = new Set((ins.best_times || []).map((b) => new Date(b.at).getHours()))
     once('best-bars', JSON.stringify([ins.today, ins.current_hour, [...good]]), () => {
       const today = ins.today || [], top = Math.max(0.01, ...today.map((t) => t.occupancy))
-      $('best-bars').replaceChildren(...today.map((t) => {
+      $('best-bars').replaceChildren(...today.map((t, i) => {
         const cls = t.hour === ins.current_hour ? 'now' : t.hour < ins.current_hour ? 'past' : good.has(t.hour) ? 'good' : ''
         const bar = el('i', { className: cls })
-        bar.style.height = `${Math.max(3, (t.occupancy / top) * 100)}%`
+        bar.style.height = `${Math.max(4, (t.occupancy / top) * 100)}%`
+        bar.style.animationDelay = `${i * 0.03}s`
         return bar
       }))
       $('best-labels').replaceChildren(...today.map((t) => el('span', { textContent: t.hour % 3 === 0 ? hourLabel(t.hour) : '' })))
@@ -479,7 +743,7 @@
     let i = -1
     for (let k = 0; k < lines.length && lines[k][0] <= pos; k++) i = k
     $('ly-prev').textContent = i > 0 ? lines[i - 1][1] : ''
-    $('ly-current').textContent = lines.length ? (i >= 0 ? lines[i][1] || '♪' : '♪') : 'No lyrics for this song'
+    $('ly-current').textContent = lines.length ? (i >= 0 ? lines[i][1] || '♪' : '♪') : 'No lyrics for this one. Dance anyway!'
     $('ly-next').textContent = lines[i + 1]?.[1] || ''
     $('ly-bar').style.width = np.duration_s ? `${Math.min(100, (pos / np.duration_s) * 100)}%` : '0%'
     $('ly-pos').textContent = clock(np.duration_s ? Math.min(pos, np.duration_s) : pos)
@@ -505,8 +769,12 @@
       $('hurry-line').querySelector('b').textContent = state.waiting ? `${people(state.waiting)} in line` : ''
       $('holdrow').hidden = !canHold
       $('no-hold').hidden = canHold
-      $('hold-hint').textContent = `Hold your hand up to the sensor for ${secs} seconds to let them know you've seen this.`
       const hold = state.hold || 0
+      once('hold-hint', `${secs}/${hold > 0}`, () => {
+        $('hold-hint').replaceChildren(
+          ...(hold > 0 ? ['Keep it there… ', el('b', { textContent: 'almost!' })]
+            : ['Hold your hand up to the sensor for ', el('b', { textContent: `${secs} seconds` }), ' to let them know you\'ve seen this.']))
+      })
       $('ring').style.strokeDashoffset = String(502.65 * (1 - hold))
       $('ring-secs').textContent = hold > 0 ? Math.max(0, Math.ceil(secs * (1 - hold))) : secs
     }
@@ -515,6 +783,7 @@
     const list = pages()
     if (pageIndex >= list.length) pageIndex = 0
     if (now - pageStarted > list[pageIndex].secs * 1000) { pageIndex = (pageIndex + 1) % list.length; pageStarted = now }
+    if (FORCED && list.some((p) => p.kind === FORCED)) pageIndex = list.findIndex((p) => p.kind === FORCED)
     const page = list[pageIndex]
     for (const kind of ['status', 'event', 'best', 'lyrics']) $(`page-${kind}`).classList.toggle('show', page.kind === kind)
     if (page.kind === 'status') showStatus(now)
@@ -524,10 +793,14 @@
     once('dots', `${list.length}/${pageIndex}`, () =>
       $('pagedots').replaceChildren(...list.map((_, i) => el('i', { className: i === pageIndex ? 'on' : '' }))))
 
+    // Top bar: in use time and the water it has used so far.
     const free = state.stall_state === 'free'
-    const minsIn = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : 0
-    $('top-state').textContent = free ? 'Free' : `In use · ${minsIn} min`
-    $('top-state').className = 'state ' + (free ? 'free' : 'in_use')
+    const secsIn = state.since ? Math.max(0, (now - new Date(state.since)) / 1000) : 0
+    once('top-state', free ? 'free' : `${Math.floor(secsIn / 60)}/${gallons(water(secsIn).gal)}`, () => {
+      $('top-state').className = 'state ' + (free ? 'free' : 'in_use')
+      if (free) { $('top-state').replaceChildren('Free'); return }
+      $('top-state').replaceChildren(`In use · ${Math.floor(secsIn / 60)} min · `, icon('drop', 'solid'), `${gallons(water(secsIn).gal)} gal`)
+    })
     $('top-waiting').hidden = !state.waiting
     $('top-waiting').querySelector('span').textContent = `${state.waiting} waiting`
 
