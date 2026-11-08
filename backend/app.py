@@ -312,8 +312,11 @@ def device_screen(stall: str = Depends(device_stall)) -> dict:
         now = conn.execute("select now() as now").fetchone()["now"]
         summary = insights.room_insights(conn, row["room_id"])
         playing = music.current(conn, row["room_id"])
+    # Water: the flow rate lets the screen show the water used by the shower that's running.
+    water = {k: summary["water"][k] for k in ("gpm", "lpm", "today_gallons", "today_liters", "per_shower_gallons")}
     return {"stall": row, "waiting": waiting, "events": upcoming, "server_time": now,
-            "insights": {k: summary[k] for k in ("now", "today", "current_hour", "best_times", "stats")},
+            "insights": {**{k: summary[k] for k in ("now", "today", "current_hour", "best_times", "stats")},
+                         "water": water},
             "music": playing}
 
 

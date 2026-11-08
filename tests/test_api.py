@@ -287,4 +287,5 @@ def test_events_keep_their_images_and_the_screen_shows_only_events_with_pictures
     screen = api["client"].get("/api/device/screen", headers={"Authorization": f"Bearer {TOKENS['s1']}"}).json()
     assert [e["title"] for e in screen["events"]] == ["Pizza & Pitch Night"]
     assert "qr_svg" not in screen["events"][0]
-    assert {"now", "today", "best_times"} <= screen["insights"].keys()
+    assert {"now", "today", "best_times", "water"} <= screen["insights"].keys()
+    assert screen["insights"]["water"]["gpm"] == 2.5 and screen["insights"]["water"]["lpm"] == 9.5
