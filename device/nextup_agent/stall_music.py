@@ -36,7 +36,7 @@ LRCLIB = "https://lrclib.net/api"
 LRC_STAMP = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
 DRIFT_S = 1.5          # a jump in position bigger than this is a seek; smaller is polling jitter
 NUDGE_S = 9.0          # how long the "shower faster" pop-up stays up
-SHAMPOO_S = 7.0        # the "Let's shampoo!" moment: cloud, bottle, then a wave of bubbles
+SHAMPOO_S = 11.5       # the "Let's shampoo!" moment: 10 s of cloud, bottle and bubbles, then they float away
 
 
 def parse_lrc(text: str) -> list[list]:

@@ -10,8 +10,9 @@ It's off unless `MUSIC=spotify` is set, and everything below can be undone (see 
 
 When the third song of a shower starts (after `MUSIC_SHAMPOO_AFTER` songs, 2 by default), a
 cloud by the headphone lion on the lyrics page says "Let's shampoo!". The lion pours a shampoo
-bottle, suds land on its mane, and then a wave of bubbles rises from the bottom, covers the whole
-screen for a moment and floats away (about 7 seconds in all). It happens once per shower.
+bottle and suds land on its mane. From 0.5 s, bubbles rise slowly from the bottom until they
+cover the whole screen (by about 7 s). From 7 to 10 s they move about every which way, then they
+float off (about 11 seconds in all). It happens once per shower.
 `MUSIC_SHAMPOO_AFTER=0` turns it off.
 
 ## Exit celebration (`CELEBRATE_SECONDS`, not tied to music)

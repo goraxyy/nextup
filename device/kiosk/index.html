@@ -282,9 +282,23 @@
           background:
             radial-gradient(circle at 50% 8%, rgba(255, 255, 255, 0) 0 60px, transparent 61px),
             linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(240, 248, 255, 0.96) 12%, rgba(232, 244, 252, 0.98) 100%); }
-  #foam.go { visibility: visible; animation: foamwave 3.6s cubic-bezier(0.45, 0, 0.35, 1) forwards; }
-  @keyframes foamwave { 0% { transform: translateY(100%); } 38% { transform: translateY(-22%); } 62% { transform: translateY(-27%); }
-                        100% { transform: translateY(-115%); opacity: 0.2; } }
+  /* Phases (showShampoo): rise slowly from the bottom, cover the screen with bubbles moving every
+     which way, then float off. */
+  #foam.rise { visibility: visible; transform: translateY(-24%); transition: transform 6.5s cubic-bezier(0.35, 0, 0.25, 1); }
+  #foam.leave { visibility: visible; transform: translateY(-115%); opacity: 0;
+                transition: transform 1.3s cubic-bezier(0.5, 0, 0.8, 0.4), opacity 1.3s ease-in; }
+  #foam.chaos span { animation-name: chaos0; animation-timing-function: ease-in-out; animation-direction: alternate; }
+  #foam.chaos span.c1 { animation-name: chaos1; }
+  #foam.chaos span.c2 { animation-name: chaos2; }
+  #foam.chaos span.c3 { animation-name: chaos3; }
+  @keyframes chaos0 { 25% { transform: translate(26px, -30px) scale(1.08); } 50% { transform: translate(-18px, -8px) scale(0.94); }
+                      75% { transform: translate(14px, 24px) scale(1.05); } 100% { transform: translate(-28px, 12px); } }
+  @keyframes chaos1 { 25% { transform: translate(-30px, 18px) scale(0.92); } 50% { transform: translate(22px, 30px) scale(1.1); }
+                      75% { transform: translate(-10px, -26px); } 100% { transform: translate(30px, -12px) scale(0.96); } }
+  @keyframes chaos2 { 33% { transform: translate(0, -38px) scale(1.12); } 66% { transform: translate(34px, 10px) scale(0.9); }
+                      100% { transform: translate(-24px, -20px) scale(1.04); } }
+  @keyframes chaos3 { 20% { transform: translate(-22px, -22px); } 45% { transform: translate(28px, -6px) scale(1.1); }
+                      70% { transform: translate(-6px, 30px) scale(0.92); } 100% { transform: translate(18px, 18px); } }
   #foam span { position: absolute; border-radius: 50%; border: 2px solid rgba(108, 172, 228, 0.55);
                background: radial-gradient(circle at 32% 28%, #ffffff 0 18%, rgba(255, 255, 255, 0.75) 30%, rgba(185, 217, 235, 0.45) 70%, rgba(255, 255, 255, 0.85) 100%);
                box-shadow: inset -4px -6px 10px rgba(108, 172, 228, 0.25); animation: wobble 1.4s ease-in-out infinite alternate; }
@@ -716,7 +730,8 @@
   $('foam').replaceChildren(...Array.from({ length: 110 }, (_, i) => {
     const b = document.createElement('span'), size = 28 + ((i * 53) % 110), x = (i * 137) % 840, y = 20 + ((i * 89) % 680)
     Object.assign(b.style, { width: `${size}px`, height: `${size}px`, left: `${x - size / 2}px`, top: `${y}px`,
-                             animationDelay: `${-(i % 7) * 0.2}s` })
+                             animationDelay: `${-(i % 7) * 0.2}s`, animationDuration: `${0.7 + ((i * 37) % 10) / 10}s` })
+    b.className = `c${i % 4}`
     return b
   }))
   $('boot-lion').innerHTML = SCENES.sleep()
@@ -941,9 +956,17 @@
     const sh = state.shampoo, on = !!(sh && sh.until * 1000 > now && state.local_music?.now_playing)
     once('shampoo', on ? `on/${sh.until}` : 'off', () => {
       $('ly-scene').innerHTML = on ? SCENES.shampoo() : SCENES.music()
-      clearTimeout(drawn.foamTimer)
-      $('foam').classList.remove('go')
-      if (on) drawn.foamTimer = setTimeout(() => { void $('foam').offsetWidth; $('foam').classList.add('go') }, 3000)
+      const foam = $('foam')
+      ;(drawn.foamTimers || []).forEach(clearTimeout)
+      foam.className = ''
+      if (!on) return
+      const at = (ms, fn) => setTimeout(fn, ms)
+      drawn.foamTimers = [
+        at(500, () => { void foam.offsetWidth; foam.className = 'rise' }),       // 0.5-7 s: bubbles rise slowly
+        at(7000, () => { foam.className = 'rise chaos' }),                        // 7-10 s: every which way
+        at(10000, () => { foam.className = 'leave chaos' }),                      // 10-11.3 s: float off
+        at(11400, () => { foam.className = '' }),
+      ]
     })
   }
 
