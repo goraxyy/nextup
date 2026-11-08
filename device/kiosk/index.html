@@ -5,112 +5,354 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NextUp stall</title>
 <style>
-  :root { --bg: #0b1220; --ink: #f8fafc; --muted: #94a3b8; --free: #22c55e; --busy: #f59e0b; --accent: #60a5fa; }
+  /* Columbia palette (visualidentity.columbia.edu): navy #003087, Columbia Blue #B9D9EB (dark
+     text only), accent #C75000, transactional green #228848. Fonts are bundled for offline use. */
+  @font-face { font-family: "EB Garamond"; font-weight: 400; src: url(fonts/eb-garamond-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "EB Garamond"; font-weight: 600; src: url(fonts/eb-garamond-latin-600-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Montserrat"; font-weight: 400; src: url(fonts/montserrat-latin-400-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Montserrat"; font-weight: 500; src: url(fonts/montserrat-latin-500-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Montserrat"; font-weight: 600; src: url(fonts/montserrat-latin-600-normal.woff2) format("woff2"); }
+  @font-face { font-family: "Montserrat"; font-weight: 700; src: url(fonts/montserrat-latin-700-normal.woff2) format("woff2"); }
+
+  :root {
+    --navy: #003087; --navy-deep: #00205c; --cu-blue: #B9D9EB; --sky: #6CACE4; --bright: #0077C8;
+    --accent: #C75000; --green: #228848; --ink: #222222; --white: #ffffff;
+    --serif: "EB Garamond", Garamond, "Times New Roman", serif;
+    --sans: Montserrat, Arial, sans-serif;
+  }
   * { box-sizing: border-box; }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); cursor: none;
-               font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
-  .top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
-         padding: 18px 28px; font-size: 22px; color: var(--muted); }
-  .dots span { margin-left: 18px; }
-  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #475569; margin-right: 6px; }
-  .dot.on { background: var(--free); }
-  .main { height: 100%; display: grid; place-items: center; text-align: center; }
-  .state { font-size: 120px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
-  .state.free { color: var(--free); }
-  .state.in_use { color: var(--busy); }
-  .sub { font-size: 34px; color: var(--muted); margin-top: 18px; }
-  .banner { position: absolute; bottom: 0; left: 0; right: 0; padding: 22px; text-align: center;
-            font-size: 32px; background: #1e293b; }
-  .overlay { position: absolute; inset: 0; display: none; place-items: center; text-align: center;
-             background: var(--bg); }
-  .overlay.show { display: grid; }
-  .overlay h1 { font-size: 64px; margin: 0 0 16px; }
-  .overlay p { font-size: 30px; color: var(--muted); margin: 0 auto; max-width: 820px; }
-  .ring { width: 190px; height: 190px; margin: 34px auto 0; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; color: var(--white);
+               font-family: var(--sans); font-size: 18px; line-height: 1.5;
+               background: radial-gradient(circle at 20% 0%, #0a3a99 0%, var(--navy-deep) 55%, #001339 100%); }
+
+  .top { position: absolute; top: 0; left: 0; right: 0; height: 64px; display: flex; align-items: center;
+         gap: 20px; padding: 0 32px; background: rgba(0, 48, 135, 0.85); border-bottom: 4px solid var(--cu-blue); z-index: 2; }
+  .top .brand { font-family: var(--serif); font-size: 28px; font-weight: 600; }
+  .top .name { font-size: 20px; font-weight: 700; color: var(--white); }
+  .top .state { font-size: 17px; font-weight: 700; padding: 4px 14px; border-radius: 999px; letter-spacing: 0.04em; }
+  .top .state.free { background: var(--green); color: var(--white); }
+  .top .state.in_use { background: var(--cu-blue); color: var(--navy); }
+  .top .waiting { font-size: 16px; font-weight: 600; color: var(--cu-blue); flex: 1; }
+  .top .clock { font-size: 24px; font-weight: 600; }
+  .top .dots { font-size: 14px; color: var(--cu-blue); }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #5b6b8c; margin: 0 6px 0 14px; }
+  .dot.on { background: #4ade80; }
+
+  .page { position: absolute; top: 68px; bottom: 44px; left: 0; right: 0; padding: 28px 48px;
+          opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.6s ease; display: flex; }
+  .page.show { opacity: 1; transform: none; }
+  .center { flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+  .kicker { font-size: 16px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cu-blue); }
+
+  /* Status */
+  .pill { display: inline-block; padding: 8px 28px; border-radius: 999px; font-weight: 700;
+          font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .pill.free { background: var(--green); color: var(--white); }
+  .pill.in_use { background: var(--cu-blue); color: var(--navy); }
+  .big { font-family: var(--serif); font-size: 80px; font-weight: 600; line-height: 1.05; margin: 22px 0 10px; }
+  .sub { font-size: 26px; color: var(--cu-blue); }
+  .hint { margin-top: 26px; display: inline-flex; gap: 10px; align-items: center; font-size: 20px; color: var(--cu-blue);
+          background: rgba(185, 217, 235, 0.12); border-radius: 999px; padding: 8px 20px; }
+  .hint b { color: var(--white); }
+
+  /* Event */
+  .event { align-items: center; gap: 40px; }
+  .event .photo { width: 470px; height: 400px; flex: none; border-radius: 22px; overflow: hidden;
+                  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); background: var(--navy); position: relative; }
+  .event .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+  .event .photo img.backdrop { object-fit: cover; filter: blur(20px) brightness(0.55); transform: scale(1.15); }
+  .badge { position: absolute; top: 14px; left: 14px; background: var(--green); color: var(--white); font-size: 15px; font-weight: 700;
+           text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 14px; border-radius: 999px; }
+  .event .text { flex: 1; min-width: 0; }
+  .event h2 { font-family: var(--serif); font-size: 50px; font-weight: 600; line-height: 1.1; margin: 12px 0 18px;
+              display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .event .when { font-size: 26px; font-weight: 700; }
+  .event .where { font-size: 22px; color: var(--cu-blue); margin-top: 6px; }
+  .tags { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .tag { background: var(--cu-blue); color: var(--navy); font-weight: 700; font-size: 15px;
+         padding: 4px 14px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .credit { position: absolute; right: 48px; bottom: 8px; font-size: 13px; color: rgba(185, 217, 235, 0.7); }
+
+  /* Best time */
+  .best { flex-direction: column; justify-content: center; gap: 6px; }
+  .best h2 { font-family: var(--serif); font-size: 64px; font-weight: 600; margin: 4px 0 6px; line-height: 1.05; }
+  .chips { display: flex; gap: 14px; align-items: center; font-size: 22px; color: var(--cu-blue); }
+  .chips span.time { background: var(--white); color: var(--navy); font-weight: 700; font-size: 24px; padding: 6px 18px; border-radius: 14px; }
+  .bars { margin-top: 26px; display: grid; grid-template-columns: repeat(24, 1fr); gap: 6px; align-items: end; height: 150px; }
+  .bars i { display: block; border-radius: 4px 4px 0 0; background: var(--sky); min-height: 3px; }
+  .bars i.now { background: var(--white); }
+  .bar-labels { display: grid; grid-template-columns: repeat(24, 1fr); gap: 6px; font-size: 13px; color: var(--cu-blue); margin-top: 6px; }
+
+  /* Lyrics */
+  .lyrics { flex-direction: column; justify-content: center; }
+  .lyrics .song { font-size: 22px; color: var(--cu-blue); margin-top: 6px; }
+  .lyrics .song b { color: var(--white); }
+  .lyrics .line { font-family: var(--serif); margin: 0; line-height: 1.15; }
+  .lyrics .prev, .lyrics .next { font-size: 34px; color: rgba(185, 217, 235, 0.45); }
+  .lyrics .current { font-size: 64px; font-weight: 600; margin: 14px 0; }
+  .lyrics .lines { margin-top: 28px; }
+  .songbar { margin-top: 30px; height: 6px; border-radius: 6px; background: rgba(185, 217, 235, 0.2); overflow: hidden; }
+  .songbar i { display: block; height: 100%; background: var(--cu-blue); }
+
+  .pagedots { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; }
+  .pagedots i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 5px; background: #3a4f80; transition: all 0.3s; }
+  .pagedots i.on { background: var(--cu-blue); width: 26px; border-radius: 9px; }
+  .banner { position: absolute; bottom: 0; left: 0; right: 0; height: 56px; display: grid; place-items: center;
+            background: var(--cu-blue); color: var(--navy); font-size: 22px; font-weight: 700; z-index: 3; }
+
+  /* Interruptions */
+  .overlay { position: absolute; inset: 0; display: none; z-index: 5; background: var(--navy-deep);
+             flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px; }
+  .overlay.show { display: flex; }
+  #hurry { border: 14px solid var(--accent); background: radial-gradient(circle at 50% 30%, #3a1800 0%, var(--navy-deep) 60%); }
+  #hurry.flash { animation: flash 0.7s ease-in-out 4; }
+  @keyframes flash { 50% { border-color: var(--navy-deep); background: #3a1800; } }
+  #hurry .kicker { color: #ffb37a; font-size: 22px; }
+  #hurry h1 { font-family: var(--serif); font-size: 76px; font-weight: 600; line-height: 1.05; margin: 10px 0 6px; }
+  #hurry .line { font-size: 24px; color: var(--cu-blue); }
+  .holdrow { display: flex; align-items: center; gap: 28px; margin-top: 26px; }
+  .ring { width: 150px; height: 150px; flex: none; }
   .ring circle { fill: none; stroke-width: 16; }
-  .ring .track { stroke: #1e293b; }
+  .ring .track { stroke: #24345c; }
   .ring .fill { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
                 transition: stroke-dashoffset 0.15s linear; }
-  .thanks h1 { color: var(--free); }
+  .ring text { fill: var(--white); font: 700 44px var(--sans); text-anchor: middle; dominant-baseline: central; }
+  #hold-hint { font-size: 24px; max-width: 520px; text-align: left; }
+  #thanks h1 { font-family: var(--serif); font-size: 84px; margin: 16px 0 8px; }
+  #thanks p { font-size: 28px; color: var(--cu-blue); margin: 0; }
+  .check { width: 124px; height: 124px; border-radius: 50%; background: var(--green); display: grid; place-items: center;
+           font-size: 72px; font-weight: 700; box-shadow: 0 0 0 14px rgba(34, 136, 72, 0.25); }
 </style>
 </head>
 <body>
-  <div class="top"><span id="name">Stall</span>
-    <span class="dots"><span><i class="dot" id="sensor"></i>sensor</span><span><i class="dot" id="online"></i>online</span></span>
+  <div class="top">
+    <span class="brand">NextUp</span>
+    <span class="name" id="name">Stall</span>
+    <span class="state" id="top-state"></span>
+    <span class="waiting" id="top-waiting"></span>
+    <span class="clock" id="clock"></span>
+    <span class="dots"><i class="dot" id="sensor"></i>sensor<i class="dot" id="online"></i>online</span>
   </div>
-  <div class="main"><div><div class="state" id="state">…</div><div class="sub" id="sub"></div></div></div>
+
+  <section class="page center" id="page-status">
+    <span class="pill" id="pill">…</span>
+    <div class="big" id="big"></div>
+    <div class="sub" id="sub"></div>
+    <div class="hint" id="status-hint" hidden></div>
+  </section>
+
+  <section class="page event" id="page-event">
+    <div class="photo"><img id="ev-bg" class="backdrop" alt="" aria-hidden="true"><img id="ev-img" alt=""><span class="badge" id="ev-badge" hidden>Free food</span></div>
+    <div class="text">
+      <div class="kicker">On campus</div>
+      <h2 id="ev-title"></h2>
+      <div class="when" id="ev-when"></div>
+      <div class="where" id="ev-where"></div>
+      <div class="tags" id="ev-tags"></div>
+    </div>
+    <div class="credit">Columbia University Events</div>
+  </section>
+
+  <section class="page best" id="page-best">
+    <div class="kicker">Best time to shower</div>
+    <h2 id="best-title"></h2>
+    <div class="chips" id="best-chips"></div>
+    <div class="bars" id="best-bars"></div>
+    <div class="bar-labels" id="best-labels"></div>
+  </section>
+
+  <section class="page lyrics" id="page-lyrics">
+    <div class="kicker" id="ly-kicker">Now playing</div>
+    <div class="song" id="ly-song"></div>
+    <div class="lines">
+      <p class="line prev" id="ly-prev"></p>
+      <p class="line current" id="ly-current"></p>
+      <p class="line next" id="ly-next"></p>
+    </div>
+    <div class="songbar"><i id="ly-bar"></i></div>
+  </section>
+
+  <div class="pagedots" id="pagedots"></div>
   <div class="banner" id="reserved" hidden></div>
 
-  <div class="overlay" id="notify">
-    <div>
-      <h1>Someone's waiting for a shower</h1>
-      <p id="notify-hint">Hold your hand up near the sensor for 2 seconds to let them know you've seen this.</p>
-      <svg class="ring" id="ring-svg" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
-        <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/></svg>
+  <div class="overlay" id="hurry">
+    <div class="kicker">Someone's waiting</div>
+    <h1>Please start wrapping up</h1>
+    <div class="line" id="hurry-line"></div>
+    <div class="holdrow" id="holdrow">
+      <svg class="ring" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
+        <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/>
+        <text x="100" y="100" id="ring-secs">5</text></svg>
+      <div id="hold-hint"></div>
     </div>
+    <div class="line" id="no-hold" hidden>They've been told this is on your screen. Thanks!</div>
   </div>
-  <div class="overlay thanks" id="thanks"><div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div></div>
+  <div class="overlay" id="thanks"><div class="check">✓</div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
 
 <script>
   const $ = (id) => document.getElementById(id)
   let state = null, lastChime = null, audio = null
+  let pageIndex = 0, pageStarted = Date.now()
+  const MOOD = { quiet: 'Quiet right now', moderate: 'Getting busy', busy: 'Busy right now' }
 
-  function chime() {
+  function chime() {  // only if the Pi has an audio output; the flashing border is the main signal
     try {
       audio = audio || new AudioContext()
       ;[660, 880].forEach((freq, i) => {
-        const osc = audio.createOscillator(), gain = audio.createGain()
+        const osc = audio.createOscillator(), gain = audio.createGain(), t0 = audio.currentTime + i * 0.25
         osc.frequency.value = freq
-        gain.gain.setValueAtTime(0.0001, audio.currentTime + i * 0.25)
-        gain.gain.exponentialRampToValueAtTime(0.3, audio.currentTime + i * 0.25 + 0.02)
-        gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + i * 0.25 + 0.4)
+        gain.gain.setValueAtTime(0.0001, t0)
+        gain.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4)
         osc.connect(gain).connect(audio.destination)
-        osc.start(audio.currentTime + i * 0.25); osc.stop(audio.currentTime + i * 0.25 + 0.45)
+        osc.start(t0); osc.stop(t0 + 0.45)
       })
     } catch (e) { /* no audio device */ }
+  }
+
+  function flash() {
+    const el = $('hurry')
+    el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash')
+    chime()
+  }
+
+  const people = (n) => (n === 1 ? '1 person' : `${n} people`)
+  const hourLabel = (h) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`
+  const el = (tag, props) => Object.assign(document.createElement(tag), props)
+
+  function music() {
+    const m = state.music
+    return m && m.now_playing && m.now_playing.playing ? m : null
+  }
+
+  function songPosition(np) {
+    if (!np.playing) return np.position_s || 0
+    return (Date.now() + (state.clock_offset_ms || 0) - new Date(np.started_at).getTime()) / 1000
+  }
+
+  function pages() {
+    // While the stall is in use there's no status page: the time is in the top bar.
+    const p = state.pages || {}, free = state.stall_state === 'free'
+    const list = free ? [{ kind: 'status', secs: p.status_s || 10 }] : []
+    const events = (state.events || []).slice(0, 3)
+    if (music()) list.push({ kind: 'lyrics', secs: state.stall_state === 'free' ? 20 : 30 })
+    if (events[0]) list.push({ kind: 'event', event: events[0], secs: p.event_s || 8 })
+    if (state.insights) list.push({ kind: 'best', secs: 10 })
+    for (const e of events.slice(1)) list.push({ kind: 'event', event: e, secs: p.event_s || 8 })
+    return list.length ? list : [{ kind: 'status', secs: p.status_s || 10 }]  // offline and nothing cached yet
+  }
+
+  function showEvent(e) {
+    if ($('ev-img').getAttribute('src') !== e.image) { $('ev-img').src = e.image; $('ev-bg').src = e.image }
+    $('ev-badge').hidden = !(e.tags || []).includes('free food')
+    $('ev-title').textContent = e.title               // feed text: always textContent, never HTML
+    $('ev-when').textContent = e.when || ''
+    $('ev-where').textContent = e.location || ''
+    $('ev-tags').replaceChildren(...(e.tags || []).filter((t) => t !== 'free food')
+      .map((t) => el('span', { className: 'tag', textContent: t })))
+  }
+
+  function showBest() {
+    const ins = state.insights
+    $('best-title').textContent = MOOD[ins.now?.mood] || 'Getting busy'
+    $('best-chips').replaceChildren(el('span', { textContent: 'Quieter at' }),
+      ...(ins.best_times || []).map((b) => el('span', { className: 'time', textContent: b.label })))
+    const today = ins.today || []
+    $('best-bars').replaceChildren(...today.map((t) => {
+      const bar = el('i', { className: t.hour === ins.current_hour ? 'now' : '' })
+      bar.style.height = `${Math.max(2, t.occupancy * 100)}%`
+      return bar
+    }))
+    $('best-labels').replaceChildren(...today.map((t) => el('span', { textContent: t.hour % 3 === 0 ? hourLabel(t.hour) : '' })))
+  }
+
+  function showLyrics() {
+    const m = music(), np = m.now_playing, lines = m.lyrics || []
+    $('ly-song').replaceChildren(el('b', { textContent: np.title }), document.createTextNode(np.artist ? ` · ${np.artist}` : ''))
+    const pos = songPosition(np)
+    let i = -1
+    for (let k = 0; k < lines.length && lines[k][0] <= pos; k++) i = k
+    $('ly-prev').textContent = i > 0 ? lines[i - 1][1] : ''
+    $('ly-current').textContent = lines.length ? (i >= 0 ? lines[i][1] || '♪' : '♪') : 'No lyrics for this song'
+    $('ly-next').textContent = lines[i + 1]?.[1] || ''
+    $('ly-bar').style.width = np.duration_s ? `${Math.min(100, (pos / np.duration_s) * 100)}%` : '0%'
   }
 
   function render() {
     if (!state) return
     const now = Date.now()
+    $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     $('name').textContent = state.stall_name || state.stall
     $('sensor').classList.toggle('on', !!state.sensor_ok)
     $('online').classList.toggle('on', !!state.online)
 
+    // Interruptions first: the Hurry pop-up, then "Thanks!".
+    const hurry = !!state.notify, thanks = !hurry && state.thanks_until * 1000 > now
+    $('hurry').classList.toggle('show', hurry)
+    $('thanks').classList.toggle('show', thanks)
+    if (hurry) {
+      const canHold = state.hand_hold !== false, secs = Math.round(state.hold_s || 5)
+      $('hurry-line').textContent = state.waiting ? `${people(state.waiting)} in line` : ''
+      $('holdrow').style.display = canHold ? '' : 'none'
+      $('no-hold').hidden = canHold
+      $('hold-hint').textContent = `Hold your hand up to the sensor for ${secs} seconds to let them know you've seen this.`
+      const hold = state.hold || 0
+      $('ring').style.strokeDashoffset = String(502.65 * (1 - hold))
+      $('ring-secs').textContent = hold > 0 ? Math.max(0, Math.ceil(secs * (1 - hold))) : secs
+    }
+
+    // The cycling pages.
+    const list = pages()
+    if (pageIndex >= list.length) pageIndex = 0
+    if (now - pageStarted > list[pageIndex].secs * 1000) { pageIndex = (pageIndex + 1) % list.length; pageStarted = now }
+    const page = list[pageIndex]
+    for (const kind of ['status', 'event', 'best', 'lyrics']) $(`page-${kind}`).classList.toggle('show', page.kind === kind)
+    if (page.kind === 'event') showEvent(page.event)
+    if (page.kind === 'best') showBest()
+    if (page.kind === 'lyrics' && music()) showLyrics()
+    $('pagedots').replaceChildren(...list.map((_, i) => el('i', { className: i === pageIndex ? 'on' : '' })))
+
     const free = state.stall_state === 'free'
-    $('state').textContent = free ? 'Free' : 'In use'
-    $('state').className = 'state ' + (free ? 'free' : 'in_use')
+    const minsIn = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : null
+    $('top-state').textContent = free ? 'Free' : `In use · ${minsIn ?? 0} min`
+    $('top-state').className = 'state ' + (free ? 'free' : 'in_use')
+    $('top-waiting').textContent = state.waiting ? `${people(state.waiting)} waiting` : ''
+    $('pill').textContent = free ? 'Free' : 'In use'
+    $('pill').className = 'pill ' + (free ? 'free' : 'in_use')
     const mins = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : null
-    $('sub').textContent = free ? 'Step in whenever you like' : (mins !== null ? `${mins} min` : '')
+    $('big').textContent = free ? 'Step in whenever you like' : (mins !== null ? `${mins} min` : 'In use')
+    $('sub').textContent = state.waiting
+      ? (free ? `${people(state.waiting)} in line` : `${people(state.waiting)} waiting. Please keep it short.`)
+      : 'Nobody in line'
+    const best = state.insights?.best_times?.[0]
+    const playing = music()
+    $('status-hint').hidden = !(best || playing)
+    if (playing) $('status-hint').replaceChildren(document.createTextNode('♪ '), el('b', { textContent: playing.now_playing.title }),
+      document.createTextNode(playing.now_playing.artist ? ` · ${playing.now_playing.artist}` : ''))
+    else if (best) $('status-hint').replaceChildren(document.createTextNode('Quieter at '), el('b', { textContent: best.label }))
 
     const until = state.reserved_until ? new Date(state.reserved_until).getTime() : 0
     const left = Math.round((until - now) / 1000)
     $('reserved').hidden = !(free && left > 0)
     if (left > 0) $('reserved').textContent = `Held for the next person in line · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
-
-    $('notify').classList.toggle('show', !!state.notify)
-    // Without a hand-hold sensor (ULTRASONIC=off), don't ask for a hand-hold that can't be seen.
-    const canHold = state.hand_hold !== false
-    $('notify-hint').textContent = canHold
-      ? "Hold your hand up near the sensor for 2 seconds to let them know you've seen this."
-      : 'They can see that this is on your screen. No rush.'
-    $('ring-svg').style.display = canHold ? '' : 'none'
-    $('ring').style.strokeDashoffset = String(502.65 * (1 - (state.hold || 0)))
-    $('thanks').classList.toggle('show', !state.notify && state.thanks_until * 1000 > now)
   }
 
   function connect() {
     const ws = new WebSocket(`ws://${location.hostname || 'localhost'}:8765`)
     ws.onmessage = (e) => {
-      state = JSON.parse(e.data)
-      if (lastChime !== null && state.chime > lastChime) chime()
-      lastChime = state.chime
+      const next = JSON.parse(e.data)
+      if ((!state?.notify && next.notify) || (lastChime !== null && next.chime > lastChime && next.notify)) {
+        setTimeout(flash, 0)  // a new Hurry, or the 60 s reminder
+      }
+      lastChime = next.chime
+      state = next
       render()
     }
     ws.onclose = () => setTimeout(connect, 1000)
   }
   connect()
-  setInterval(render, 1000)
+  setInterval(render, 200)
 </script>
 </body>
 </html>

@@ -137,7 +137,9 @@ def test_the_hc_sr04_can_be_left_out_when_the_radar_decides_presence(tmp_path):
     env = {**RADAR_ENV, "ULTRASONIC": "off", "NEXTUP_DATA_DIR": str(tmp_path)}
     agent = Agent(load(env))
     assert [type(s).__name__ for s in agent.sensors] == ["LD2410Sensor"]   # its GPIO pins are never opened
-    assert agent.kiosk.state["hand_hold"] is False                          # the pop-up won't ask for a hold
+    assert agent.kiosk.state["hand_hold"] is True                           # the radar can see a raised hand
+    no_hold = Agent(load({**env, "RADAR_HOLD": "off"}))
+    assert no_hold.kiosk.state["hand_hold"] is False                        # the pop-up won't ask for a hold
     assert Agent(load({**RADAR_ENV, "NEXTUP_DATA_DIR": str(tmp_path)})).kiosk.state["hand_hold"] is True
     with pytest.raises(SystemExit, match="ULTRASONIC=off needs PRESENCE_SENSOR=ld2410c"):
         load({**ENV, "ULTRASONIC": "off"})
@@ -153,8 +155,9 @@ def test_radar_starts_and_ends_sessions_with_the_same_timers():
 
 def test_with_the_radar_the_hc_sr04_only_does_the_hand_hold():
     p = Presence(load(RADAR_ENV))
+    p.hold_armed = True  # the Hurry pop-up is showing
     assert "session.start" not in kinds(p, PERSON_CLOSE, 0, 40)  # HC-SR04 alone can't start a session
-    assert kinds(p, HAND, 41, 44, step=0.1).count("input.hold") == 1
+    assert kinds(p, HAND, 41, 47, step=0.1).count("input.hold") == 1  # HOLD_SECONDS is 5 now
 
 
 def test_radar_distances_never_count_as_a_hand_hold():
@@ -170,3 +173,19 @@ def test_hc_sr04_readings_between_radar_readings_do_not_end_a_session():
         out += [k for k, _ in p.update(Reading(None), t + 0.05)]
         t += 0.1
     assert out.count("session.start") == 1 and "session.end" not in out
+
+
+def test_a_hand_raised_to_the_radar_acknowledges_the_pop_up():
+    from device.nextup_agent.ld2410 import LD2410Sensor, RadarFrame
+
+    radar = LD2410Sensor(hold=True, hold_max_cm=30, hold_min_energy=50)
+    radar.frame, radar.frame_at = RadarFrame(state=3, moving_cm=12, moving_energy=80, still_cm=90, still_energy=40), 0.0
+    near = radar.sample(0.05)
+    assert near.hold_near is True
+    radar.frame = RadarFrame(state=3, moving_cm=70, moving_energy=80, still_cm=90, still_energy=40)  # showering, not a hand
+    assert radar.sample(0.1).hold_near is False
+
+    p = Presence(load({**RADAR_ENV, "ULTRASONIC": "off"}))
+    p.hold_armed = True
+    hand = Reading(12, present=True, hold_near=True)
+    assert kinds(p, hand, 0, 5.2, step=0.1).count("input.hold") == 1

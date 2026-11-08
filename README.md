@@ -62,7 +62,7 @@ tiger/     Tiger Data migrations and the migration runner                  (buil
 supabase/  Supabase migrations: Realtime access policies, the tick job     (built)
 web/       Student website (Vite + React), deployed to Vercel              (built)
 sim/       One-shot device script: play a stall's Pi from the laptop       (built)
-scripts/   Room setup: floor code and a device token per stall             (built)
+scripts/   Room setup: a device token per stall                            (built)
 tests/     Rule tests (SQL) and API tests, against local TimescaleDB       (built)
 device/    Stall agent for the Pi (HC-SR04, API, Realtime) and the stall screen (built)
 content/   Content workers: campus events, wellness, fun modules, moderation
@@ -114,7 +114,7 @@ uv venv --python 3.12 .venv && uv pip install -r requirements-dev.txt
 vercel env pull .env.local                                # Supabase keys and secrets
 export DATABASE_URL=postgresql://postgres:nextup@localhost:5433/nextup
 .venv/bin/python tiger/migrate.py                         # apply the migrations
-.venv/bin/python scripts/setup_room.py --code 4821        # floor code + device tokens for r1
+.venv/bin/python scripts/setup_room.py                   # device tokens for room r1
 .venv/bin/pytest                                          # rule and API tests
 ```
 

@@ -11,15 +11,18 @@ import json
 import uuid
 from typing import Literal
 
+import logging
+
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-from . import db
-from . import supabase_admin
-from .auth import browser_id, check_join_code, device_stall, require_cron, verify_supabase_token
+from . import db, events, insights, music, supabase_admin
+from .auth import browser_id, device_stall, hash_secret, require_cron, verify_supabase_token
 from .config import settings
 from .realtime import flush_outbox, flush_quietly
+
+log = logging.getLogger("nextup.api")
 
 app = FastAPI(title="NextUp API", docs_url="/api/docs", openapi_url="/api/openapi.json")
 
@@ -63,6 +66,12 @@ def healthz() -> JSONResponse:
 
 # Room status (public) ------------------------------------------------------------------
 
+HURRY_SQL = (
+    "(select json_build_object('status', n.status, 'created_at', n.created_at)"
+    "   from notifies n where n.stall_id = s.id and n.created_at > now() - interval '10 minutes'"
+    "  order by n.created_at desc limit 1) as hurry"
+)
+
 
 @app.get("/api/rooms/{room}")
 def get_room(room: str) -> dict:
@@ -72,35 +81,77 @@ def get_room(room: str) -> dict:
             "select s.id, s.name, s.state, s.since, s.person, s.water, s.timer_end, s.simulated,"
             "       coalesce(d.last_seen > now() - interval '60 seconds', false) as online,"
             "       (select json_agg(json_build_object('id', r.id, 'type', r.type))"
-            "          from reports r where r.stall_id = s.id and r.status = 'open') as reports"
+            "          from reports r where r.stall_id = s.id and r.status = 'open') as reports,"
+            f"      {HURRY_SQL}"
             "  from stalls s left join devices d on d.stall_id = s.id"
             " where s.room_id = %s order by s.id",
             [room],
         ).fetchall()
         waiting = conn.execute("select count(*) as n from queue where status = 'waiting'").fetchone()["n"]
+        st = conn.execute("select notify_min_session_minutes, notify_stall_cooldown_minutes,"
+                          " notify_requester_cooldown_minutes from settings where id = 1").fetchone()
         now = conn.execute("select now() as now").fetchone()["now"]
     return {
         "id": info["id"],
         "name": info["name"],
-        "needs_code": info["join_code_hash"] is not None,
         "server_time": now,
         "stalls": stalls,
         "waiting": waiting,
+        "hurry_rules": st,
     }
 
 
-class JoinBody(BaseModel):
-    code: str
-
-
-@app.post("/api/rooms/{room}/join")
-def join_room(room: str, body: JoinBody) -> dict:
+@app.get("/api/rooms/{room}/events")
+def room_events(room: str, limit: int = 8) -> dict:
+    """Upcoming campus events from Columbia's calendar (refreshed by the tick)."""
     with db.pool().connection() as conn:
-        check_join_code(_room(conn, room), body.code)
-    return {"ok": True}
+        _room(conn, room)
+        rows = events.upcoming(conn, limit=max(1, min(limit, 20)))
+    return {"events": rows, "source": "Columbia University Events (events.columbia.edu)"}
 
 
-# Phone actions (signed in anonymously, with the floor code) --------------------------------
+@app.get("/api/rooms/{room}/insights")
+def room_insights(room: str) -> dict:
+    """Rush hours: today's expected busyness, best times to go, weekly heatmap, wait estimate."""
+    with db.pool().connection() as conn:
+        _room(conn, room)
+        return insights.room_insights(conn, room)
+
+
+@app.get("/api/rooms/{room}/nowplaying")
+def room_now_playing(room: str) -> dict:
+    """What the room's speaker is playing, with synced lyrics if LRCLIB has them."""
+    with db.pool().connection() as conn:
+        _room(conn, room)
+        return music.current(conn, room)
+
+
+class NowPlayingBody(BaseModel):
+    title: str | None = None
+    artist: str | None = None
+    album: str | None = None
+    duration_s: float | None = None
+    position_s: float | None = None
+    playing: bool = False
+    latency_ms: float = Field(default=200, ge=0, le=2000)
+
+
+@app.post("/api/rooms/{room}/nowplaying")
+def report_now_playing(room: str, body: NowPlayingBody, x_audio_token: str | None = Header(default=None)) -> dict:
+    """Called by scripts/now_playing_mac.py on the Mac that plays Apple Music to the speaker."""
+    with db.pool().connection() as conn:
+        info = conn.execute("select audio_token_hash from rooms where id = %s", [room]).fetchone()
+        if info is None:
+            raise HTTPException(404, "no such room")
+        if not x_audio_token or not info["audio_token_hash"] or hash_secret(x_audio_token) != info["audio_token_hash"]:
+            raise HTTPException(401, "bad audio token")
+        result = music.report(conn, room, body.title, body.artist, body.album, body.duration_s,
+                              body.position_s, body.playing, body.latency_ms)
+    flush_quietly()
+    return result
+
+
+# Phone actions (signed in anonymously) ------------------------------------------------------
 
 
 @app.get("/api/rooms/{room}/me")
@@ -118,21 +169,26 @@ def my_status(room: str, browser: uuid.UUID = Depends(browser_id)) -> dict:
             " order by q.joined_at desc limit 1",
             [visitor],
         ).fetchone()
-        notify = conn.execute(
-            "select n.id as notify_id, n.status, s.name as stall_name"
-            "  from notifies n join stalls s on s.id = n.stall_id"
-            " where n.requester_id = %s and n.created_at > now() - interval '15 minutes'"
-            " order by n.created_at desc limit 1",
+        hurries = conn.execute(
+            "select n.id as notify_id, n.stall_id, n.status, n.created_at from notifies n"
+            " where n.requester_id = %s and n.created_at > now() - interval '10 minutes'"
+            " order by n.created_at desc",
+            [visitor],
+        ).fetchall()
+        cooldown_until = conn.execute(
+            "select max(n.created_at) + make_interval(mins => st.notify_requester_cooldown_minutes) as until"
+            "  from notifies n, settings st where st.id = 1 and n.requester_id = %s"
+            " group by st.notify_requester_cooldown_minutes",
             [visitor],
         ).fetchone()
-    return {"visitor_id": visitor, "queue": entry, "notify": notify}
+    return {"visitor_id": visitor, "queue": entry, "hurries": hurries,
+            "hurry_cooldown_until": cooldown_until["until"] if cooldown_until else None}
 
 
 @app.post("/api/rooms/{room}/queue")
-def join_queue(room: str, browser: uuid.UUID = Depends(browser_id),
-               x_floor_code: str | None = Header(default=None)) -> dict:
+def join_queue(room: str, browser: uuid.UUID = Depends(browser_id)) -> dict:
     with db.pool().connection() as conn:
-        check_join_code(_room(conn, room), x_floor_code)
+        _room(conn, room)
         result = conn.execute("select join_queue(%s) as r", [str(browser)]).fetchone()["r"]
     flush_quietly()
     return result
@@ -148,12 +204,14 @@ def leave(queue_id: int, browser: uuid.UUID = Depends(browser_id)) -> dict:
     return {"status": "left"}
 
 
-@app.post("/api/rooms/{room}/notify")
-def notify(room: str, browser: uuid.UUID = Depends(browser_id),
-           x_floor_code: str | None = Header(default=None)) -> dict:
+@app.post("/api/rooms/{room}/stalls/{stall}/hurry")
+def hurry(room: str, stall: str, browser: uuid.UUID = Depends(browser_id)) -> dict:
+    """Ask the person in this stall to start wrapping up (a pop-up on the stall's screen)."""
     with db.pool().connection() as conn:
-        check_join_code(_room(conn, room), x_floor_code)
-        result = conn.execute("select request_notify(%s) as r", [str(browser)]).fetchone()["r"]
+        _room(conn, room)
+        if conn.execute("select 1 from stalls where id = %s and room_id = %s", [stall, room]).fetchone() is None:
+            raise HTTPException(404, "no such stall in this room")
+        result = conn.execute("select request_hurry(%s, %s) as r", [str(browser), stall]).fetchone()["r"]
     flush_quietly()
     return result
 
@@ -244,6 +302,28 @@ def device_state(stall: str = Depends(device_stall)) -> dict:
     return {"stall": row, "notify": notify, "reserved": reserved, "server_time": now}
 
 
+@app.get("/api/device/screen")
+def device_screen(stall: str = Depends(device_stall)) -> dict:
+    """Content for the stall screen's cycling pages; the Pi fetches it every few minutes."""
+    with db.pool().connection() as conn:
+        row = conn.execute("select id, name, room_id from stalls where id = %s", [stall]).fetchone()
+        waiting = conn.execute("select count(*) as n from queue where status = 'waiting'").fetchone()["n"]
+        upcoming = events.upcoming(conn, limit=6, for_screen=True)
+        now = conn.execute("select now() as now").fetchone()["now"]
+        summary = insights.room_insights(conn, row["room_id"])
+        playing = music.current(conn, row["room_id"])
+    return {"stall": row, "waiting": waiting, "events": upcoming, "server_time": now,
+            "insights": {k: summary[k] for k in ("now", "today", "current_hour", "best_times", "stats")},
+            "music": playing}
+
+
+@app.get("/api/device/nowplaying")
+def device_now_playing(stall: str = Depends(device_stall)) -> dict:
+    with db.pool().connection() as conn:
+        room = conn.execute("select room_id from stalls where id = %s", [stall]).fetchone()["room_id"]
+        return music.current(conn, room)
+
+
 # Timers ------------------------------------------------------------------------------
 
 
@@ -252,4 +332,10 @@ def tick() -> dict:
     with db.pool().connection() as conn:
         result = conn.execute("select api_tick() as r").fetchone()["r"]
     result["sent"] = flush_outbox()
+    try:  # campus events every 30 minutes; a broken feed must never break the tick
+        with db.pool().connection() as conn:
+            result["events"] = events.refresh_if_stale(conn)
+    except Exception as exc:  # noqa: BLE001
+        log.warning("campus events refresh failed: %s", exc)
+        result["events"] = f"error: {type(exc).__name__}"
     return result

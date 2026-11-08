@@ -58,8 +58,15 @@ def test_the_empty_stalls_far_wall_is_not_a_person():
     assert "session.start" not in run(Presence(load(ENV)), WALL, 0, 60)
 
 
+def armed(env=None, **extra):
+    """Presence with the Hurry pop-up showing, so hand-holds count."""
+    p = Presence(load({**(env or ENV), **extra}))
+    p.hold_armed = True
+    return p
+
+
 def test_hand_hold_fires_once_after_two_seconds_with_progress():
-    p = Presence(load(ENV))
+    p = armed(HOLD_SECONDS="2")
     events, t = [], 0.0
     while t <= 4:
         events += p.update(HAND, t)
@@ -72,7 +79,7 @@ def test_hand_hold_fires_once_after_two_seconds_with_progress():
 
 
 def test_a_stray_reading_does_not_break_a_hold():
-    p = Presence(load(ENV))
+    p = armed(HOLD_SECONDS="2")
     events, t = [], 0.0
     while t <= 2.6:
         events += p.update(PERSON if abs(t - 1.0) < 0.05 else HAND, t)  # one far reading at 1 s
@@ -124,3 +131,26 @@ def test_queue_keeps_events_when_the_api_is_down(tmp_path):
     with pytest.raises(httpx.HTTPStatusError):
         asyncio.run(go())
     assert uplink.pending() == 1
+
+
+def hold_kinds(p, reading, seconds, step=0.1):
+    out, t = [], 0.0
+    while t <= seconds:
+        out += [k for k, _ in p.update(reading, t)]
+        t += step
+    return out
+
+
+def test_the_hand_hold_takes_five_seconds_by_default():
+    p = armed()
+    assert "input.hold" not in hold_kinds(p, HAND, 4.8)
+    assert armed().cfg.hold_s == 5.0 and hold_kinds(armed(), HAND, 5.2).count("input.hold") == 1
+
+
+def test_holds_only_count_while_the_hurry_pop_up_shows():
+    p = Presence(load(ENV))                 # no pop-up: a hand near the sensor does nothing
+    assert hold_kinds(p, HAND, 8) == []
+    p.hold_armed = True                     # pop-up shows
+    assert hold_kinds(p, HAND, 6).count("input.hold") == 1
+    p.hold_armed = False                    # pop-up closed mid-hold: the ring resets
+    assert p.update(HAND, 7.0) == [("hold.progress", 0.0)]

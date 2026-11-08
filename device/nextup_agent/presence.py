@@ -30,6 +30,9 @@ class Presence:
         self.hold_last_near = 0.0
         self.hold_fired = False
         self.last_progress = 0.0
+        # Holds only count while the Hurry pop-up is on the screen (the agent arms this), so moving
+        # around in the shower can't acknowledge anything by accident.
+        self.hold_armed = False
 
     def force(self, state: str) -> None:
         """Adopt the server's state after a restart, so a stale IN USE still ends."""
@@ -40,8 +43,12 @@ class Presence:
         radar = reading.present is not None
         if radar or self.cfg.presence_sensor != "ld2410c":
             out += self._presence(reading, now)
-        if not radar:
-            out += self._hold(reading.distance_cm, now)
+        if radar:
+            if reading.hold_near is not None:  # RADAR_HOLD: a hand raised to the radar
+                out += self._hold(reading.hold_near, now)
+        else:
+            d = reading.distance_cm
+            out += self._hold(d is not None and d <= self.cfg.hold_max_cm, now)
         return out
 
     def _presence(self, reading: Reading, now: float) -> list[tuple[str, float | None]]:
@@ -65,10 +72,14 @@ class Presence:
             out.append(("session.end", None))
         return out
 
-    def _hold(self, d: float | None, now: float) -> list[tuple[str, float | None]]:
+    def _hold(self, near: bool, now: float) -> list[tuple[str, float | None]]:
         out: list[tuple[str, float | None]] = []
         cfg = self.cfg
-        near = d is not None and d <= cfg.hold_max_cm
+        if not self.hold_armed:
+            if self.hold_since is not None:
+                self.hold_since, self.hold_fired, self.last_progress = None, False, 0.0
+                out.append(("hold.progress", 0.0))
+            return out
         if near:
             self.hold_last_near = now
             self.hold_since = self.hold_since if self.hold_since is not None else now
@@ -80,7 +91,7 @@ class Presence:
                 self.hold_fired = True
                 out.append(("input.hold", None))
         elif self.hold_since is not None and now - self.hold_last_near > HOLD_GRACE_S:
-            # The hand went away: reset, so the next hold needs a full 2 s again.
+            # The hand went away: reset, so the next hold needs the full HOLD_SECONDS again.
             self.hold_since, self.hold_fired, self.last_progress = None, False, 0.0
             out.append(("hold.progress", 0.0))
         return out

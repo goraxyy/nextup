@@ -7,8 +7,12 @@ Supabase Realtime (device:<stall>) → pop-ups, re-chimes and reservations on th
 
 import asyncio
 import dataclasses
+import datetime as dt
+import hashlib
+import json
 import logging
 import os
+import pathlib
 import socket
 import time
 
@@ -56,7 +60,8 @@ class Agent:
         self.cfg = cfg
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
         self.kiosk = Kiosk(cfg)
-        self.kiosk.publish(hand_hold=cfg.ultrasonic)  # the screen only asks for a hand-hold if one can happen
+        # The screen only asks for a hand-hold if a sensor can see one: the HC-SR04, or the radar with RADAR_HOLD.
+        self.kiosk.publish(hand_hold=cfg.ultrasonic or (cfg.presence_sensor == "ld2410c" and cfg.radar_hold))
         self.uplink = Uplink(cfg.api, cfg.device_token, cfg.data_dir)
         self.presence = Presence(cfg)
         # self.sensor decides presence (and drives the screen's "sensor" dot); every sensor in
@@ -67,7 +72,8 @@ class Agent:
                       if cfg.ultrasonic else None)
         if cfg.presence_sensor == "ld2410c":
             self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy,
-                                       cfg.radar_min_cm, cfg.radar_debug)
+                                       cfg.radar_min_cm, cfg.radar_debug, cfg.radar_hold, cfg.radar_hold_max_cm,
+                                       cfg.radar_hold_min_energy)
             self.sensors = [self.sensor] + ([ultrasonic] if ultrasonic else [])
         else:
             self.sensor = ultrasonic
@@ -75,6 +81,12 @@ class Agent:
         self.session = SupabaseSession(cfg.supabase_url, cfg.supabase_key, cfg.data_dir)
         self.channel = DeviceChannel(cfg, self.session)
         self.last_reading: Reading | None = None
+        self.music_changed = asyncio.Event()
+
+    def set_notify(self, notify: dict | None, **changes) -> None:
+        """Show or clear the Hurry pop-up; hand-holds only count while it's showing."""
+        self.presence.hold_armed = notify is not None
+        self.kiosk.publish(notify=notify, **changes)
 
     # Sensor → presence ------------------------------------------------------------
 
@@ -87,13 +99,13 @@ class Agent:
                 self.kiosk.publish(stall_state="in_use", since=now_iso(), reserved_until=None)
             elif kind == "session.end":
                 self.uplink.enqueue("session.end")
-                self.kiosk.publish(stall_state="free", since=now_iso(), notify=None)
+                self.set_notify(None, stall_state="free", since=now_iso())
             elif kind == "hold.progress":
                 self.kiosk.publish(hold=value)
             elif kind == "input.hold":
                 self.uplink.enqueue("input.hold")
                 if self.kiosk.state["notify"]:
-                    self.kiosk.publish(notify=None, thanks_until=time.time() + 4)
+                    self.set_notify(None, thanks_until=time.time() + 4)
 
     def sensor_ok(self) -> bool:
         return time.monotonic() - self.sensor.last_reading_at < 5
@@ -103,17 +115,20 @@ class Agent:
     async def on_message(self, event: str, payload: dict) -> None:
         log.info("message %s %s", event, payload)
         if event == "notify.deliver":
-            self.kiosk.publish(notify={"notify_id": payload.get("notify_id"), "status": "sent"},
-                               chime=self.kiosk.state["chime"] + 1)
+            waiting = payload.get("waiting", self.kiosk.state["waiting"])
+            self.set_notify({"notify_id": payload.get("notify_id"), "status": "sent"},
+                            waiting=waiting, chime=self.kiosk.state["chime"] + 1)
             self.uplink.enqueue("notify.delivered")
         elif event == "notify.rechime":
             self.kiosk.publish(chime=self.kiosk.state["chime"] + 1)
         elif event == "notify.closed":
             current = self.kiosk.state["notify"]
             if current and current.get("notify_id") == payload.get("notify_id"):
-                self.kiosk.publish(notify=None)
+                self.set_notify(None)
         elif event == "stall.reserved":
             self.kiosk.publish(reserved_until=payload.get("until"))
+        elif event == "nowplaying.changed":
+            self.music_changed.set()
 
     async def resync(self, client: httpx.AsyncClient) -> None:
         """After (re)connecting, catch up on anything missed while offline."""
@@ -130,9 +145,9 @@ class Agent:
             self.presence.force(stall["state"])
         notify = data.get("notify")
         reserved = data.get("reserved")
-        self.kiosk.publish(stall_name=stall.get("name"), stall_state=self.presence.state, since=stall.get("since"),
-                           notify={"notify_id": notify["notify_id"], "status": notify["status"]} if notify else None,
-                           reserved_until=reserved["until"] if reserved else None)
+        self.set_notify({"notify_id": notify["notify_id"], "status": notify["status"]} if notify else None,
+                        stall_name=stall.get("name"), stall_state=self.presence.state, since=stall.get("since"),
+                        reserved_until=reserved["until"] if reserved else None)
         if notify and notify["status"] == "sent":
             self.uplink.enqueue("notify.delivered")
 
@@ -154,6 +169,71 @@ class Agent:
                            else r.distance_cm is not None and r.distance_cm <= self.cfg.present_max_cm)
                 self.uplink.enqueue("reading", presence=present, distance_cm=r.distance_cm, water=False)
 
+    async def cache_image(self, client: httpx.AsyncClient, url: str | None) -> str | None:
+        """Download an event picture once and serve it locally (/media/...), so it shows offline."""
+        if not url:
+            return None
+        media = self.cfg.data_dir / "media"
+        media.mkdir(exist_ok=True)
+        name = hashlib.sha1(url.encode()).hexdigest()[:16] + (pathlib.PurePosixPath(url.split("?")[0]).suffix.lower() or ".jpg")
+        path = media / name
+        if not path.exists():
+            try:
+                response = await client.get(url, timeout=30, follow_redirects=True)
+                response.raise_for_status()
+                path.write_bytes(response.content)
+            except httpx.HTTPError as exc:
+                log.warning("couldn't download an event image: %s", exc)
+                return None
+        return f"/media/{name}"
+
+    def publish_screen(self, data: dict) -> None:
+        stall = data.get("stall") or {}
+        offset = 0
+        if data.get("server_time"):
+            offset = (dt.datetime.fromisoformat(data["server_time"]).timestamp() - time.time()) * 1000
+        self.kiosk.publish(events=data.get("events", []), waiting=data.get("waiting", 0),
+                           insights=data.get("insights"), music=data.get("music"), clock_offset_ms=round(offset),
+                           stall_name=stall.get("name") or self.kiosk.state["stall_name"])
+
+    async def music_updates(self, client: httpx.AsyncClient) -> None:
+        """When the song changes, fetch it (with its lyrics) for the lyrics page."""
+        while True:
+            await self.music_changed.wait()
+            self.music_changed.clear()
+            try:
+                response = await client.get(f"{self.cfg.api}/api/device/nowplaying",
+                                            headers={"Authorization": f"Bearer {self.cfg.device_token}"}, timeout=15)
+                response.raise_for_status()
+                data = response.json()
+                offset = (dt.datetime.fromisoformat(data["server_time"]).timestamp() - time.time()) * 1000
+                self.kiosk.publish(music=data, clock_offset_ms=round(offset))
+            except (httpx.HTTPError, ValueError, KeyError) as exc:
+                log.warning("couldn't fetch now playing: %s", exc)
+
+    async def screen_content(self, client: httpx.AsyncClient) -> None:
+        """Events, rush hours and music for the cycling pages; the last copy is kept for offline."""
+        cache = self.cfg.data_dir / "screen.json"
+        if cache.exists():
+            try:
+                self.publish_screen(json.loads(cache.read_text()))
+            except (OSError, ValueError):
+                pass
+        while True:
+            try:
+                response = await client.get(f"{self.cfg.api}/api/device/screen",
+                                            headers={"Authorization": f"Bearer {self.cfg.device_token}"}, timeout=20)
+                response.raise_for_status()
+                data = response.json()
+                for e in data.get("events", []):
+                    e["image"] = await self.cache_image(client, e.get("image_url"))
+                data["events"] = [e for e in data.get("events", []) if e.get("image")]
+                cache.write_text(json.dumps(data))
+                self.publish_screen(data)
+            except (httpx.HTTPError, ValueError) as exc:
+                log.warning("couldn't fetch screen content: %s (showing the last copy)", exc)
+            await asyncio.sleep(self.cfg.screen_every_s)
+
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
         for sensor in self.sensors:
@@ -170,6 +250,8 @@ class Agent:
                 self.uplink.run(client),
                 self.heartbeats(),
                 self.readings(),
+                self.screen_content(client),
+                self.music_updates(client),
                 self.channel.run(client, self.on_message, lambda: self.resync(client),
                                  on_status=lambda ok: self.kiosk.publish(online=ok)),
             )

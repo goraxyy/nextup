@@ -14,10 +14,9 @@ export async function ensureSession() {
   return signedIn.session
 }
 
-export async function api(path, { method = 'GET', body, token, code } = {}) {
+export async function api(path, { method = 'GET', body, token } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   if (token) headers.Authorization = `Bearer ${token}`
-  if (code) headers['X-Floor-Code'] = code
   const res = await fetch(`/api${path}`, { method, headers, body: body ? JSON.stringify(body) : undefined })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -36,4 +35,10 @@ export function roomFromUrl() {
 
 export function minutesSince(iso, offsetMs) {
   return Math.max(0, Math.floor((Date.now() + offsetMs - new Date(iso).getTime()) / 60000))
+}
+
+/** "1:05" from seconds. */
+export function clock(seconds) {
+  const s = Math.max(0, Math.round(seconds))
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 }

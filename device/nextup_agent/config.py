@@ -27,9 +27,10 @@ class Config:
     leave_s: float = 30.0
     range_cm: int = 300           # farther than this, or no echo, counts as nothing there
     present_max_cm: int = 120     # closer than this: someone is in the stall (calibrate per stall)
-    # Hand-hold: something this close to the sensor for this long.
+    # Hand-hold: something this close to the sensor for this long. Holds only count while the
+    # Hurry pop-up is on the screen.
     hold_max_cm: int = 15
-    hold_s: float = 2.0
+    hold_s: float = 5.0
     sample_hz: float = 10.0
     # Which sensor decides presence: "ultrasonic" (HC-SR04) or "ld2410c" (radar on the UART).
     # With the radar, the HC-SR04 still does the hand-hold.
@@ -40,11 +41,18 @@ class Config:
     radar_min_energy: int = 30    # weaker radar echoes (0-100) are ignored
     radar_min_cm: int = 0         # radar targets closer than this (e.g. a flexing plastic cover) are ignored
     radar_debug: bool = False     # log what the radar sees once a second, for tuning
+    # Hand-hold on the radar: a moving target this close and this strong (while the pop-up shows).
+    radar_hold: bool = True
+    radar_hold_max_cm: int = 30
+    radar_hold_min_energy: int = 50
     # With the radar, the HC-SR04 is only for the hand-hold. ULTRASONIC=off leaves it out entirely
     # (unplugged): no hand-hold, so the screen's Notify pop-up can't be acknowledged.
     ultrasonic: bool = True
     reading_every_s: float = 5.0
     heartbeat_every_s: float = 30.0
+    screen_every_s: float = 300.0  # how often to fetch the stall screen's content (events)
+    page_status_s: float = 10.0    # cycling pages on the stall screen
+    page_event_s: float = 8.0
 
 
 def _num(env: dict, name: str, default, cast=float):
@@ -81,7 +89,7 @@ def load(env: dict | None = None) -> Config:
         range_cm=_num(env, "RANGE_CM", 300, int),
         present_max_cm=_num(env, "PRESENT_MAX_CM", 120, int),
         hold_max_cm=_num(env, "HOLD_MAX_CM", 15, int),
-        hold_s=_num(env, "HOLD_SECONDS", 2.0),
+        hold_s=_num(env, "HOLD_SECONDS", 5.0),
         sample_hz=_num(env, "SAMPLE_HZ", 10.0),
         reading_every_s=_num(env, "READING_EVERY_SECONDS", 5.0),
         heartbeat_every_s=_num(env, "HEARTBEAT_EVERY_SECONDS", 30.0),
@@ -92,5 +100,11 @@ def load(env: dict | None = None) -> Config:
         radar_min_energy=_num(env, "RADAR_MIN_ENERGY", 30, int),
         radar_min_cm=_num(env, "RADAR_MIN_CM", 0, int),
         radar_debug=env.get("RADAR_DEBUG", "").lower() in ("1", "true", "yes"),
+        radar_hold=env.get("RADAR_HOLD", "1").strip().lower() not in ("0", "off", "false", "no"),
+        radar_hold_max_cm=_num(env, "RADAR_HOLD_MAX_CM", 30, int),
+        radar_hold_min_energy=_num(env, "RADAR_HOLD_MIN_ENERGY", 50, int),
+        screen_every_s=_num(env, "SCREEN_EVERY_SECONDS", 300.0),
+        page_status_s=_num(env, "PAGE_STATUS_SECONDS", 10.0),
+        page_event_s=_num(env, "PAGE_EVENT_SECONDS", 8.0),
         ultrasonic=ultrasonic,
     )

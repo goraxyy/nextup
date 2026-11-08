@@ -37,6 +37,13 @@ class Kiosk:
             "sensor_ok": False,
             "online": False,
             "chime": 0,            # bumped to make the screen chime
+            "events": [],          # campus events with pictures, for the cycling pages
+            "insights": None,      # best times and today's busyness, for the "best time" page
+            "music": None,         # {"now_playing", "lyrics"} from the Mac playing Apple Music
+            "clock_offset_ms": 0,  # server clock minus this Pi's clock, to sync lyrics
+            "waiting": 0,          # people in line
+            "pages": {"status_s": cfg.page_status_s, "event_s": cfg.page_event_s},
+            "hold_s": cfg.hold_s,    # seconds a hand must be held up, shown on the pop-up
         }
 
     def publish(self, **changes) -> None:
@@ -61,8 +68,19 @@ class Kiosk:
             self.clients.discard(ws)
 
     def _serve_static(self) -> None:
-        handler = functools.partial(SimpleHTTPRequestHandler, directory=str(STATIC))
-        handler.log_message = lambda *args: None
+        media = self.cfg.data_dir / "media"
+
+        class Handler(SimpleHTTPRequestHandler):
+            def translate_path(self, path: str) -> str:
+                # /media/<file> comes from the agent's cache of event images; the rest is device/kiosk.
+                if path.startswith("/media/"):
+                    return str(media / pathlib.PurePosixPath(path.split("?")[0]).name)
+                return super().translate_path(path)
+
+            def log_message(self, *args) -> None:
+                pass
+
+        handler = functools.partial(Handler, directory=str(STATIC))
         ThreadingHTTPServer((self.cfg.kiosk_host, self.cfg.kiosk_http_port), handler).serve_forever()
 
     async def run(self) -> None:

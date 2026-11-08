@@ -196,13 +196,141 @@ def test_unknown_event_type_is_rejected(conn, room):
 
 
 def test_tick_runs_the_simulator_only_when_it_is_on(conn, room):
-    set_state(conn, "s2", "free", 2)
-    for _ in range(5):
-        conn.execute("select api_tick()")
+    conn.execute("update settings set sim_gap_override_minutes = 0.001")  # would start every free stall
+    conn.execute("update settings set sim_last_run = now() - interval '60 seconds'")
+    conn.execute("select api_tick()")
+    assert conn.execute("select count(*) as n from stalls where state <> 'free'").fetchone()["n"] == 0  # off
+
+    conn.execute("update settings set simulator_on = true, sim_last_run = now() - interval '60 seconds'")
+    conn.execute("select api_tick()")
+    states = dict(conn.execute("select id, state from stalls").fetchall() and
+                  [(r["id"], r["state"]) for r in conn.execute("select id, state from stalls").fetchall()])
+    assert states["s1"] == "free"  # the real stall is never simulated
+    assert all(states[s] == "in_use" for s in ("s2", "s3", "s4", "s5"))
+
+
+# 006: no floor code, Hurry on a chosen stall, the simulator ---------------------------------
+
+
+def test_rooms_have_no_floor_code(conn, room):
+    assert conn.execute("select join_code_hash from rooms where id = 'r1'").fetchone()["join_code_hash"] is None
+
+
+def hurry(conn, phone, stall):
+    return conn.execute("select request_hurry(%s, %s) as r", [phone, stall]).fetchone()["r"]
+
+
+def test_hurry_reaches_the_chosen_stall_with_the_line_length(conn, room):
+    set_state(conn, "s1", "in_use", 12)
+    set_state(conn, "s2", "in_use", 30)  # longer, but not the one chosen
+    conn.execute("select join_queue('someone-waiting')")
+    result = hurry(conn, A, "s1")
+    assert result["status"] == "sent" and result["stall_id"] == "s1"
+    deliver = outbox(conn, "notify.deliver")
+    assert [(m["topic"], m["payload"]["waiting"]) for m in deliver] == [("device:s1", 1)]
+    assert [m["payload"]["stall_id"] for m in outbox(conn, "hurry.changed")] == ["s1"]
+
+
+def test_hurry_rules(conn, room):
+    assert hurry(conn, A, "s1")["status"] == "free"
+    assert hurry(conn, A, "nope")["status"] == "unknown_stall"
+    set_state(conn, "s1", "in_use", 2)
+    assert hurry(conn, A, "s1")["status"] == "too_soon"  # under notify_min_session_minutes (10)
+    set_state(conn, "s1", "in_use", 12)
+    set_state(conn, "s3", "in_use", 12)
+    assert hurry(conn, A, "s1")["status"] == "sent"
+    assert hurry(conn, B, "s1")["status"] == "open"           # one open Hurry per stall
+    assert hurry(conn, A, "s3")["status"] == "cooldown"       # this phone just hurried
+    conn.execute("update notifies set status = 'expired', created_at = now() - interval '3 minutes'")
+    assert hurry(conn, B, "s1")["status"] == "stall_cooldown"  # stall hurried 3 min ago (cooldown 5)
+    assert hurry(conn, A, "s3")["status"] == "sent"            # phone cooldown (2 min) is over
+
+
+def test_sim_gap_follows_the_new_york_clock(conn):
+    gaps = {hour: conn.execute("select sim_gap_minutes(%s::timestamptz) as g",
+                               [f"2026-11-09 {hour}:30 America/New_York"]).fetchone()["g"]
+            for hour in ("03", "08", "13", "19", "22")}
+    assert gaps == {"03": 60, "08": 2, "13": 25, "19": 10, "22": 3}
+
+
+def run_simulator(conn, seconds_since_last=60):
+    conn.execute("update settings set sim_last_run = now() - make_interval(secs => %s)", [seconds_since_last])
+    conn.execute("select simulate_stalls()")
+
+
+def test_simulated_showers_last_10_to_20_minutes_and_finish(conn, room):
+    conn.execute("update settings set simulator_on = true, sim_gap_override_minutes = 0.001")  # start at once
+    run_simulator(conn)
+    rows = conn.execute("select id, state, extract(epoch from timer_end - now()) / 60 as minutes"
+                        " from stalls where simulated order by id").fetchall()
+    assert all(r["state"] == "in_use" and 10 <= r["minutes"] <= 20 for r in rows)
+    assert conn.execute("select state from stalls where id = 's1'").fetchone()["state"] == "free"  # real stall untouched
+
+    conn.execute("update stalls set timer_end = now() + interval '30 seconds' where id = 's2'")
+    run_simulator(conn)
+    assert conn.execute("select state, water from stalls where id = 's2'").fetchone() == {"state": "finishing", "water": False}
+    conn.execute("update stalls set timer_end = now() - interval '1 second' where id = 's2'")
+    run_simulator(conn)
     assert conn.execute("select state from stalls where id = 's2'").fetchone()["state"] == "free"
 
+
+def test_the_simulator_pace_does_not_depend_on_how_often_it_runs(conn, room):
+    conn.execute("update settings set simulator_on = true, sim_gap_override_minutes = 0.001")
+    run_simulator(conn, seconds_since_last=0)  # called again straight away: no time has passed
+    assert conn.execute("select count(*) as n from stalls where simulated and state <> 'free'").fetchone()["n"] == 0
+
+
+def test_simulated_stalls_answer_a_hurry(conn, room):
     conn.execute("update settings set simulator_on = true")
-    for _ in range(40):  # 35% chance per tick; 40 misses in a row is about 1 in 30 million
-        conn.execute("select api_tick()")
-    assert conn.execute("select state from stalls where id = 's2'").fetchone()["state"] == "in_use"
-    assert conn.execute("select state from stalls where id = 's1'").fetchone()["state"] == "free"  # real stall untouched
+    set_state(conn, "s2", "in_use", 12)
+    conn.execute("update stalls set timer_end = now() + interval '8 minutes' where id = 's2'")
+    notify_id = hurry(conn, A, "s2")["notify_id"]
+    run_simulator(conn)
+    assert conn.execute("select status from notifies where id = %s", [notify_id]).fetchone()["status"] == "delivered"
+
+    conn.execute("update notifies set created_at = now() - interval '41 seconds' where id = %s", [notify_id])
+    run_simulator(conn)
+    status = conn.execute("select status from notifies where id = %s", [notify_id]).fetchone()["status"]
+    if (notify_id * 7919) % 10 < 7:
+        assert status == "acknowledged"
+        left = conn.execute("select extract(epoch from timer_end - now()) as s from stalls where id = 's2'").fetchone()["s"]
+        assert left <= 120  # wraps up within 2 minutes
+    else:
+        assert status == "delivered"  # this one lets it expire
+
+
+def test_water_is_minutes_with_the_water_on_times_the_flow_rate(conn, room):
+    from backend import insights
+
+    conn.execute("update settings set water_gpm = 2.0")
+    conn.execute("update stalls set state = 'in_use', since = now() - interval '5 minutes' where id = 's3'")
+    conn.execute("delete from stall_events")
+    # One finished shower today: 10 minutes with the water on ('finishing' is water off).
+    conn.execute("insert into stall_events (time, stall_id, state, prev_state, prev_duration_s) values"
+                 " (now() - interval '2 seconds', 's2', 'in_use', 'free', 3600),"
+                 " (now() - interval '1 second', 's2', 'finishing', 'in_use', 600)")
+    now = conn.execute("select now() as now").fetchone()["now"]
+    midnight = now.astimezone(insights.NY).replace(hour=0, minute=0, second=0, microsecond=0)
+    live = min(5.0, (now - midnight).total_seconds() / 60)   # s3 has had the water on for 5 minutes
+
+    water = insights.room_insights(conn, room)["water"]
+    assert water["gpm"] == 2.0 and water["lpm"] == 7.6
+    assert water["today_gallons"] == round((10 + live) * 2.0)
+    assert water["per_shower_gallons"] == 20.0
+    assert (water["running_now"], water["flowing_now_gpm"]) == (1, 2.0)
+    assert water["daily"][-1] == {"day": midnight.date().isoformat(), "gallons": 20, "showers": 1}
+
+
+def test_event_text_from_the_feed_is_unescaped_once_more():
+    import datetime as dt
+
+    from backend import events
+
+    start = dt.datetime.now(dt.timezone.utc) + dt.timedelta(hours=1)
+    stamp = start.strftime("%Y%m%dT%H%M%SZ")
+    feed = {"bwEventList": {"events": [{
+        "summary": "Modeling &amp;amp; Valuation", "status": "CONFIRMED", "guid": "g", "recurrenceId": "",
+        "start": {"allday": "false", "utcdate": stamp}, "end": {"allday": "false", "utcdate": stamp},
+        "location": {}, "description": "<p>Valuation &amp;amp; Interview Prep</p>"}]}}
+    [event] = events.parse(feed, dt.datetime.now(dt.timezone.utc))
+    assert (event["title"], event["blurb"]) == ("Modeling & Valuation", "Valuation & Interview Prep")

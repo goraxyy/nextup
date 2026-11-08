@@ -41,7 +41,7 @@ def room(conn):
 
     The SQL simulator is switched off so tests are deterministic, and the outbox starts empty.
     """
-    conn.execute("update settings set simulator_on = false, notify_min_session_minutes = 10")
+    conn.execute("update settings set simulator_on = false, notify_min_session_minutes = 10, sim_gap_override_minutes = null")
     conn.execute("delete from notifies")
     conn.execute("delete from queue")
     conn.execute("update stalls set state = 'free', person = false, water = false, since = now() - interval '1 hour'")

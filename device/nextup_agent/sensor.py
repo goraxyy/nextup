@@ -30,6 +30,8 @@ class Reading:
     # Set by the LD2410C radar (ld2410.py), which decides presence itself. None means an HC-SR04
     # distance: presence comes from PRESENT_MAX_CM, and it can also be a hand-hold.
     present: bool | None = None
+    # Set by the radar when RADAR_HOLD is on: a strong moving target close to it (a raised hand).
+    hold_near: bool | None = None
 
 
 class UltrasonicSensor:
@@ -67,7 +69,7 @@ class FakeSensor:
 
     in    someone in the stall, 70 cm away
     out   nobody
-    hold  a hand 8 cm away for 2.5 s, then back to "in"
+    hold  a hand 8 cm away for 6 s (longer than the 5 s hold), then back to "in"
     """
 
     def __init__(self) -> None:
@@ -83,7 +85,7 @@ class FakeSensor:
         for line in sys.stdin:
             cmd = line.strip().lower()
             if cmd == "hold":
-                self.hold_until, self.mode = time.monotonic() + 2.5, "in"
+                self.hold_until, self.mode = time.monotonic() + 6.0, "in"
             elif cmd in ("in", "out"):
                 self.mode = cmd
             else:

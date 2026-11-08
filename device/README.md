@@ -6,7 +6,7 @@ sends events to the API (`/api/device/events`), listens for this stall's message
 Realtime (`device:<stall>`), and drives the stall screen at http://localhost:8080.
 
 ```
-HC-SR04 ──► presence (in use after 20 s, free after 30 s; hand-hold = within 15 cm for 2 s)
+HC-SR04 ──► presence (in use after 20 s, free after 30 s; hand-hold = within 15 cm for 5 s)
                │                                   ▲ stall state on (re)connect: GET /api/device/state
                ▼                                   │
         SQLite queue ──► POST /api/device/events ──┘ (survives outages and restarts)
@@ -92,7 +92,9 @@ laptop, `scripts/pi_env.py s1` prints a filled-in copy with the stall's token.
 | `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | | Supabase project (the publishable key is public) |
 | `TRIG_PIN`, `ECHO_PIN` | 23, 24 | HC-SR04 pins (BCM) |
 | `PRESENT_MAX_CM` | 120 | Closer than this means someone is in the stall |
-| `HOLD_MAX_CM`, `HOLD_SECONDS` | 15, 2 | Hand-hold: this close, this long |
+| `HOLD_MAX_CM`, `HOLD_SECONDS` | 15, 5 | Hand-hold: this close, this long; only counts while the Hurry pop-up shows |
+| `RADAR_HOLD`, `RADAR_HOLD_MAX_CM`, `RADAR_HOLD_MIN_ENERGY` | on, 30, 50 | With the radar: a hand raised to it also counts |
+| `PAGE_STATUS_SECONDS`, `PAGE_EVENT_SECONDS` | 10, 8 | Stall screen: how long each cycling page shows |
 | `ENTER_SECONDS`, `LEAVE_SECONDS` | 20, 30 | Presence hysteresis |
 | `PRESENCE_SENSOR` | ultrasonic | `ld2410c`: the radar decides presence, the HC-SR04 only the hand-hold |
 | `RADAR_PORT`, `RADAR_BAUD` | /dev/serial0, 256000 | The radar's serial port |

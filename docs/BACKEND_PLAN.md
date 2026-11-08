@@ -50,8 +50,7 @@ in Tiger.
 
 A phone joins the line, and Stall 1 frees up:
 
-1. The phone, signed in anonymously, sends `POST /api/rooms/r1/queue` with its Supabase token and
-   the floor code. The API calls `join_queue(<uid>)`, which adds a `queue` row with the uid as
+1. The phone, signed in anonymously, sends `POST /api/rooms/r1/queue` with its Supabase token. The API calls `join_queue(<uid>)`, which adds a `queue` row with the uid as
    `visitor_id`.
 2. In Stall 1 the Pi sends `POST /api/device/events` with `session.end`. `record_device_event()`
    sets the stall `free`.
@@ -113,8 +112,8 @@ Realtime settings so public channels can't be used at all.
 ## Identity
 
 - **Phones:** Supabase anonymous sign-in; the uid is the `visitor_id` in `queue` and the
-  `requester_id` in `notifies`. Every write also needs the room's floor code
-  (`rooms.join_code_hash`, set by `scripts/setup_room.py`).
+  `requester_id` in `notifies`. There's no floor code since migration 006; per-phone cooldowns
+  limit abuse.
 - **Stall Pis, for the API:** a token per stall, stored as a SHA-256 hash in `devices.token_hash`
   (`scripts/setup_room.py` issues them and writes `devices.local.json`, git-ignored).
 - **Stall Pis, for Realtime (with the kiosk):** the Pi signs in anonymously and the API sets
@@ -136,7 +135,8 @@ Realtime settings so public channels can't be used at all.
 | `tiger/migrations/002_notify_reports_devices.sql` | Team's Notify, reports, devices (rebuilt from the live database) |
 | `tiger/migrations/003_prefer_real_stalls.sql` | Real stalls first for Notify; only real stalls call the next person |
 | `tiger/migrations/004_outbox.sql` | Outbox and its triggers, next to the team's pg_notify triggers |
-| `tiger/migrations/005_web_access.sql` | Floor code, device tokens, replay guard, the API's SQL functions, `api_tick()` |
+| `tiger/migrations/005_web_access.sql` | Device tokens, replay guard, the API's SQL functions, `api_tick()` |
+| `tiger/migrations/006_hurry_simulator_events.sql` | No floor code, `request_hurry()` for a chosen stall, the 10–20 minute simulator with rush hours, `campus_events` |
 | `supabase/migrations/…_realtime_policies.sql`, `…_room_topics.sql` | Who reads which topic |
 | `supabase/migrations/…_tick_cron.sql` | pg_net, the 10 s tick job and a daily cleanup |
 
@@ -150,11 +150,12 @@ Realtime settings so public channels can't be used at all.
 |---|---|---|
 | `GET /api/healthz` | Anyone | Tiger reachable, Realtime and cron configured, outbox backlog |
 | `GET /api/rooms/{room}` | Anyone | Stalls (state, since, water, simulated, open reports), line length |
-| `POST /api/rooms/{room}/join` | Phone | Checks the floor code |
 | `GET /api/rooms/{room}/me` | Phone | Your place in line or your called stall; your latest Notify |
-| `POST /api/rooms/{room}/queue` | Phone + floor code | Join the line |
+| `POST /api/rooms/{room}/queue` | Phone | Join the line |
 | `DELETE /api/queue/{id}` | Phone | Leave the line, or pass on your turn |
-| `POST /api/rooms/{room}/notify` | Phone + floor code | Pop-up on the longest session's screen |
+| `POST /api/rooms/{room}/stalls/{stall}/hurry` | Phone | Hurry pop-up on that stall's screen; 2 min cooldown per phone, 5 per stall |
+| `GET /api/rooms/{room}/events` | Anyone | Upcoming campus events (Columbia's calendar, refreshed by the tick) |
+| `GET /api/device/screen` | Stall token | Content for the stall screen's cycling pages: events with QR codes, line length |
 | `POST /api/device/events` | Stall token | Up to 500 events: `session.start`, `session.end`, `state`, `reading`, `heartbeat`, `input.hold`, `notify.delivered`, `safety.alert` |
 | `POST /api/tick` | Supabase Cron (`X-Cron-Secret`) | `api_tick()` and an outbox flush |
 

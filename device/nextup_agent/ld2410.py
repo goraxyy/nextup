@@ -137,9 +137,11 @@ class LD2410Sensor:
     """
 
     def __init__(self, port: str = "/dev/serial0", baud: int = 256000, max_cm: int = 150, min_energy: int = 30,
-                 min_cm: int = 0, debug: bool = False) -> None:
+                 min_cm: int = 0, debug: bool = False, hold: bool = False, hold_max_cm: int = 30,
+                 hold_min_energy: int = 50) -> None:
         self.port, self.baud, self.max_cm, self.min_energy = port, baud, max_cm, min_energy
         self.min_cm, self.debug = min_cm, debug
+        self.hold, self.hold_max_cm, self.hold_min_energy = hold, hold_max_cm, hold_min_energy
         self.last_reading_at = 0.0
         self.frame: RadarFrame | None = None
         self.frame_at = 0.0
@@ -162,7 +164,10 @@ class LD2410Sensor:
             still = f"{f.still_cm:4d} cm E{f.still_energy:3d}" if f.state & 2 else "   -          "
             log.info("radar: moving %s | still %s | counts %-3s | score %3d %s",
                      moving, still, "yes" if raw else "no", self.filter.score, "OCCUPIED" if occupied else "free")
-        return Reading(distance_cm=nearest_cm(f), present=occupied)
+        hold_near = None
+        if self.hold:  # a hand raised to the radar: a strong moving target very close to it
+            hold_near = bool(f.state & 1) and 0 < f.moving_cm <= self.hold_max_cm and f.moving_energy >= self.hold_min_energy
+        return Reading(distance_cm=nearest_cm(f), present=occupied, hold_near=hold_near)
 
     def _run(self, loop, on_reading) -> None:
         import serial  # pyserial; only needed on the Pi

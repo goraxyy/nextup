@@ -67,9 +67,3 @@ def require_cron(x_cron_secret: str | None = Header(default=None)) -> None:
     secret = settings().cron_secret
     if not secret or not x_cron_secret or not hmac.compare_digest(secret, x_cron_secret):
         raise HTTPException(401, "bad cron secret")
-
-
-def check_join_code(room: dict, code: str | None) -> None:
-    expected = room.get("join_code_hash")
-    if expected and not (code and hmac.compare_digest(expected, hash_secret(code.strip()))):
-        raise HTTPException(403, "wrong or missing floor code")
