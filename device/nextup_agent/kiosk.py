@@ -44,6 +44,11 @@ class Kiosk:
             "waiting": 0,          # people in line
             "pages": {"status_s": cfg.page_status_s, "event_s": cfg.page_event_s},
             "hold_s": cfg.hold_s,    # seconds a hand must be held up, shown on the pop-up
+            # Experimental shower music (MUSIC=spotify, stall_music.py); unused otherwise.
+            "local_music": None,     # {"now_playing", "lyrics"} from Spotify on this Pi
+            "gesture": 0.0,          # 0-1: a hand held up toward "next song"
+            "music_feedback": None,  # {"action": paused|playing|next, "until": epoch s}
+            "music_hint": None,      # None: music off; "": show "NextUp <stall name>"
         }
 
     def publish(self, **changes) -> None:

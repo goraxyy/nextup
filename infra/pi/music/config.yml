@@ -1,0 +1,16 @@
+# NextUp shower music (experimental). Remove with: systemctl --user disable --now nextup-spotify; rm -rf ~/nextup-music
+device_name: NextUp Stall 1
+device_type: speaker
+audio_backend: pulseaudio      # PipeWire default output: the AUX jack now, a Bluetooth speaker later
+bitrate: 160
+initial_volume: 60
+prefer_firewall_friendly_ports: true
+zeroconf_enabled: true         # shows up in the Spotify app on the same Wi-Fi
+credentials:
+  type: zeroconf
+  zeroconf:
+    persist_credentials: false # forget whoever was playing once they disconnect
+server:
+  enabled: true
+  address: localhost           # only the agent on this Pi can control it
+  port: 3678

@@ -1,0 +1,11 @@
+[Unit]
+Description=NextUp shower music: Spotify Connect receiver (experimental)
+After=pipewire-pulse.service
+
+[Service]
+ExecStart=%h/nextup-music/go-librespot --config_dir %h/nextup-music/config
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

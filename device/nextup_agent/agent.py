@@ -24,6 +24,7 @@ from .kiosk import Kiosk
 from .ld2410 import LD2410Sensor, RadarSetup
 from .presence import Presence
 from .sensor import FakeSensor, Reading, UltrasonicSensor
+from .stall_music import StallMusic
 from .realtime import DeviceChannel, SupabaseSession
 from .uplink import Uplink, now_iso
 
@@ -89,6 +90,10 @@ class Agent:
         self.channel = DeviceChannel(cfg, self.session)
         self.last_reading: Reading | None = None
         self.music_changed = asyncio.Event()
+        # Experimental: the shower's own music (MUSIC=spotify). None leaves everything as before.
+        self.stall_music = StallMusic(cfg.music_api, self.kiosk) if cfg.music == "spotify" else None
+        if self.stall_music:
+            self.kiosk.publish(music_hint=cfg.music_device_name or "")
 
     def set_notify(self, notify: dict | None, **changes) -> None:
         """Show or clear the Hurry pop-up; hand-holds only count while it's showing."""
@@ -113,6 +118,8 @@ class Agent:
                 self.uplink.enqueue("input.hold")
                 if self.kiosk.state["notify"]:
                     self.set_notify(None, thanks_until=time.time() + 4)
+        if self.stall_music and reading.hold_near is not None:  # radar gestures for the music
+            self.stall_music.on_hand(reading.hold_near, now, hurry_showing=self.presence.hold_armed)
 
     def sensor_ok(self) -> bool:
         return time.monotonic() - self.sensor.last_reading_at < 5
@@ -252,6 +259,9 @@ class Agent:
                    else f"presence: LD2410C on {cfg.radar_port}, hand-hold: {' + '.join(holds)}"
                    if cfg.presence_sensor == "ld2410c" else hc_sr04)
         log.info("NextUp agent %s for stall %s → %s (%s)", __version__, cfg.stall, cfg.api, sensors)
+        if self.stall_music:
+            log.info("shower music (experimental): Spotify Connect via %s, radar gestures %s", cfg.music_api,
+                     "on" if cfg.presence_sensor == "ld2410c" and cfg.radar_hold else "off (needs the radar with RADAR_HOLD)")
         async with httpx.AsyncClient() as client:
             await asyncio.gather(
                 self.kiosk.run(),
@@ -260,6 +270,7 @@ class Agent:
                 self.readings(),
                 self.screen_content(client),
                 self.music_updates(client),
+                *([self.stall_music.run(client)] if self.stall_music else []),
                 self.channel.run(client, self.on_message, lambda: self.resync(client),
                                  on_status=lambda ok: self.kiosk.publish(online=ok)),
             )

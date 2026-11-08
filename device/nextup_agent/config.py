@@ -59,6 +59,11 @@ class Config:
     reading_every_s: float = 5.0
     heartbeat_every_s: float = 30.0
     screen_every_s: float = 300.0  # how often to fetch the stall screen's content (events)
+    # Experimental shower music (stall_music.py): "spotify" plays through go-librespot on this
+    # Pi and lets radar gestures pause and skip. Empty or "off": no change from before.
+    music: str = ""
+    music_api: str = "http://127.0.0.1:3678"
+    music_device_name: str = ""  # the Spotify Connect name, for the screen's hint
     page_status_s: float = 10.0    # cycling pages on the stall screen
     page_event_s: float = 8.0
 
@@ -96,6 +101,10 @@ def load(env: dict | None = None) -> Config:
     if not ultrasonic and presence_sensor != "ld2410c":
         raise SystemExit("ULTRASONIC=off needs PRESENCE_SENSOR=ld2410c: without the radar, the HC-SR04 is the only sensor")
     gate_cm = _num(env, "RADAR_GATE_CM", 75, int)
+    music = env.get("MUSIC", "").strip().lower()
+    music = "" if music in ("", "0", "off", "false", "no") else music
+    if music not in ("", "spotify"):
+        raise SystemExit(f"MUSIC must be spotify or off (got {music!r})")
     if gate_cm not in (75, 20):
         raise SystemExit(f"RADAR_GATE_CM must be 75 or 20 (got {gate_cm})")
     return Config(
@@ -139,4 +148,7 @@ def load(env: dict | None = None) -> Config:
         page_status_s=_num(env, "PAGE_STATUS_SECONDS", 10.0),
         page_event_s=_num(env, "PAGE_EVENT_SECONDS", 8.0),
         ultrasonic=ultrasonic,
+        music=music,
+        music_api=env.get("MUSIC_API", "http://127.0.0.1:3678"),
+        music_device_name=env.get("MUSIC_DEVICE_NAME", ""),
     )

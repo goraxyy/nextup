@@ -182,6 +182,26 @@
   .songbar div { flex: 1; height: 8px; border-radius: 8px; background: #dce9f3; overflow: hidden; }
   .songbar i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--sky), var(--bright)); }
 
+  /* Shower music (experimental, MUSIC=spotify): radar gestures and their feedback */
+  .lyrics.paused .scene * { animation-play-state: paused !important; }
+  .lyrics .kicker .state-paused { color: var(--accent); }
+  .gesture-hint { margin-top: 10px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+  .gesture-hint .ico { color: var(--bright); font-size: 16px; }
+  .gesture { position: absolute; right: 18px; bottom: 34px; z-index: 4; display: flex; align-items: center; gap: 12px;
+             padding: 10px 16px 10px 10px; border-radius: 22px; background: var(--white); box-shadow: 0 10px 30px rgba(0, 48, 135, 0.25);
+             transition: opacity 0.2s; }
+  .gesture svg.gring { width: 58px; height: 58px; }
+  .gring circle { fill: none; stroke-width: 9; }
+  .gring .track { stroke: #e4eef7; }
+  .gring .fill { stroke: var(--bright); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset 0.12s linear; }
+  .gesture .gico { position: absolute; left: 10px; width: 58px; height: 58px; display: grid; place-items: center; color: var(--navy); font-size: 24px; }
+  .gesture .glbl { font-size: 13px; color: var(--muted); line-height: 1.35; }
+  .gesture .glbl b { color: var(--navy); }
+  .toast { position: absolute; left: 50%; top: 50%; z-index: 4; transform: translate(-50%, -50%); display: flex; align-items: center; gap: 12px;
+           padding: 16px 28px; border-radius: 26px; background: var(--navy); color: var(--white); font-size: 26px; font-weight: 700;
+           box-shadow: 0 16px 40px rgba(0, 48, 135, 0.35); animation: toast-in 0.3s cubic-bezier(0.2, 1.5, 0.4, 1); }
+  .toast .ico { font-size: 30px; }
+  @keyframes toast-in { from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; } }
   .pagedots { position: absolute; bottom: 8px; left: 0; right: 0; text-align: center; line-height: 0; }
   .pagedots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px; background: #a9c6dd; transition: all 0.3s; }
   .pagedots i.on { background: var(--navy); width: 24px; border-radius: 8px; }
@@ -279,6 +299,10 @@
   <symbol id="i-sensor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></symbol>
   <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.4a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/></symbol>
   <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4.5" width="4" height="15" rx="1.2"/><rect x="14" y="4.5" width="4" height="15" rx="1.2"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="M5 5v14l10-7z"/><rect x="16" y="5" width="3" height="14" rx="1"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V3.5a1.5 1.5 0 0 1 3 0V11M14 10.5V5a1.5 1.5 0 0 1 3 0v6.5M17 9a1.5 1.5 0 0 1 3 0v5a8 8 0 0 1-8 8h-.5a7 7 0 0 1-5.4-2.6L3.3 16a1.7 1.7 0 0 1 2.6-2.2L8 16"/></symbol>
   <symbol id="i-paw" viewBox="0 0 24 24"><ellipse cx="12" cy="16" rx="5" ry="4.2"/><circle cx="6" cy="10.5" r="2.2"/><circle cx="10" cy="7" r="2.2"/><circle cx="14" cy="7" r="2.2"/><circle cx="18" cy="10.5" r="2.2"/></symbol>
 </svg>
 
@@ -357,7 +381,7 @@
   <section class="page lyrics" id="page-lyrics">
     <div class="stage-blob" id="ly-scene"></div>
     <div class="np">
-      <div class="kicker"><svg class="ico"><use href="#i-note"/></svg>Now playing</div>
+      <div class="kicker" id="ly-kicker"><svg class="ico"><use href="#i-note"/></svg><span>Now playing</span></div>
       <div class="title" id="ly-title"></div>
       <div class="artist" id="ly-artist"></div>
       <div class="card lines">
@@ -366,10 +390,19 @@
         <p class="next" id="ly-next"></p>
       </div>
       <div class="songbar"><span id="ly-pos">0:00</span><div><i id="ly-bar"></i></div><span id="ly-dur"></span></div>
+      <div class="gesture-hint" id="ly-gesture-hint" hidden><svg class="ico"><use href="#i-hand"/></svg>
+        <span>Raise a hand to the sensor to pause or play. Keep it there to skip.</span></div>
     </div>
   </section>
 
   <div class="pagedots" id="pagedots"></div>
+  <div class="gesture" id="gesture" hidden>
+    <svg class="gring" viewBox="0 0 100 100"><circle class="track" cx="50" cy="50" r="40"/>
+      <circle class="fill" id="gesture-fill" cx="50" cy="50" r="40" stroke-dasharray="251.3" stroke-dashoffset="251.3"/></svg>
+    <span class="gico" id="gesture-ico"></span>
+    <span class="glbl" id="gesture-lbl"></span>
+  </div>
+  <div class="toast" id="toast" hidden></div>
   <div class="banner" id="reserved" hidden><span id="reserved-lion"></span><span>Held for the next person in line</span><b id="reserved-left"></b></div>
 
   <div class="overlay" id="hurry">
@@ -620,12 +653,14 @@
   }
 
   function music() {
+    if (state.local_music?.now_playing) return state.local_music  // this stall's own (MUSIC=spotify), even paused
     const m = state.music
     return m && m.now_playing && m.now_playing.playing ? m : null
   }
 
   function songPosition(np) {
     if (!np.playing) return np.position_s || 0
+    if (np.local) return (Date.now() - np.started_at_ms) / 1000  // timed on this Pi's own clock
     return (Date.now() + (state.clock_offset_ms || 0) - new Date(np.started_at).getTime()) / 1000
   }
 
@@ -637,6 +672,8 @@
 
   function pages() {
     const p = state.pages || {}, free = state.stall_state === 'free'
+    // While the person showering plays their own music, stay on the lyrics, with the status between.
+    if (state.local_music?.now_playing) return [{ kind: 'lyrics', secs: 45 }, { kind: 'status', secs: 8 }]
     const list = [{ kind: 'status', secs: p.status_s || 10 }]
     const events = (state.events || []).slice(0, 3)
     if (music()) list.push({ kind: 'lyrics', secs: free ? 20 : 30 })
@@ -686,7 +723,9 @@
     const chips = []
     if (playing) chips.push(chip('note', '', playing.artist ? `${playing.title} · ${playing.artist}` : playing.title))
     if (free && best) chips.push(chip('sparkle', 'Quieter at ', best.label))
-    once('status-chips', JSON.stringify([free, playing?.title, best?.label]), () => $('status-chips').replaceChildren(...chips))
+    const device = state.music_hint === null || state.music_hint === undefined ? null : (state.music_hint || `NextUp ${state.stall_name || ''}`.trim())
+    if (device && !playing) chips.push(chip('note', 'Play your music: ', `Spotify → ${device}`))
+    once('status-chips', JSON.stringify([free, playing?.title, best?.label, device]), () => $('status-chips').replaceChildren(...chips))
   }
 
   function showEvent(e) {
@@ -748,6 +787,32 @@
     $('ly-bar').style.width = np.duration_s ? `${Math.min(100, (pos / np.duration_s) * 100)}%` : '0%'
     $('ly-pos').textContent = clock(np.duration_s ? Math.min(pos, np.duration_s) : pos)
     $('ly-dur').textContent = np.duration_s ? clock(np.duration_s) : ''
+    const paused = np.local && !np.playing
+    $('page-lyrics').classList.toggle('paused', paused)
+    once('ly-kicker', paused, () => $('ly-kicker').replaceChildren(icon(paused ? 'pause' : 'note', paused ? 'solid' : ''),
+      el('span', { className: paused ? 'state-paused' : '', textContent: paused ? 'Paused' : 'Now playing' })))
+    $('ly-gesture-hint').hidden = !(np.local && state.hand_hold !== false)
+  }
+
+  // Radar gestures for the shower's own music: a ring while a hand is up, then a toast.
+  function showGesture(now) {
+    const g = state.local_music?.now_playing && !state.notify ? state.gesture || 0 : 0
+    $('gesture').hidden = !(g > 0)
+    if (g > 0) {
+      $('gesture-fill').style.strokeDashoffset = String(251.3 * (1 - g))
+      once('gesture-phase', g >= 1, () => {
+        $('gesture-ico').replaceChildren(icon(g >= 1 ? 'next' : 'hand', g >= 1 ? 'solid' : ''))
+        $('gesture-lbl').replaceChildren(...(g >= 1 ? [el('b', { textContent: 'Next song!' })]
+          : ['Let go: ', el('b', { textContent: 'pause / play' }), el('br'), 'Keep holding: ', el('b', { textContent: 'next song' })]))
+      })
+    }
+    const fb = state.music_feedback, show = fb && fb.until * 1000 > now
+    $('toast').hidden = !show
+    if (show) once('toast', `${fb.action}/${fb.until}`, () => {
+      const [name, text] = { paused: ['pause', 'Paused'], playing: ['play', 'Playing'], next: ['next', 'Next song'] }[fb.action] || ['note', fb.action]
+      $('toast').replaceChildren(icon(name, 'solid'), el('span', { textContent: text }))
+      $('toast').style.animation = 'none'; void $('toast').offsetWidth; $('toast').style.animation = ''
+    })
   }
 
   function render() {
@@ -779,7 +844,10 @@
       $('ring-secs').textContent = hold > 0 ? Math.max(0, Math.ceil(secs * (1 - hold))) : secs
     }
 
-    // The cycling pages.
+    // The cycling pages. When the shower's own music starts, go straight to its lyrics.
+    const localUri = state.local_music?.now_playing?.uri || null
+    if (localUri && drawn.localUri !== localUri) { pageIndex = 0; pageStarted = now }
+    drawn.localUri = localUri
     const list = pages()
     if (pageIndex >= list.length) pageIndex = 0
     if (now - pageStarted > list[pageIndex].secs * 1000) { pageIndex = (pageIndex + 1) % list.length; pageStarted = now }
@@ -790,6 +858,7 @@
     if (page.kind === 'event') showEvent(page.event)
     if (page.kind === 'best') showBest(now)
     if (page.kind === 'lyrics' && music()) showLyrics()
+    showGesture(now)
     once('dots', `${list.length}/${pageIndex}`, () =>
       $('pagedots').replaceChildren(...list.map((_, i) => el('i', { className: i === pageIndex ? 'on' : '' }))))
 
