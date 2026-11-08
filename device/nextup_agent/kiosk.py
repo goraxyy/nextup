@@ -49,6 +49,7 @@ class Kiosk:
             "gesture": 0.0,          # 0-1: a hand held up toward "next song"
             "music_feedback": None,  # {"action": paused|playing|next, "until": epoch s}
             "music_hint": None,      # None: music off; "": show "NextUp <stall name>"
+            "music_nudge": None,     # {"songs", "level", "until"}: the lion asks them to shower faster
         }
 
     def publish(self, **changes) -> None:

@@ -201,3 +201,43 @@ def test_without_a_token_file_it_says_how_to_sign_in(tmp_path):
         await client.aclose()
 
     asyncio.run(go())
+
+
+# The "shower faster" nudge every few songs (MUSIC_NUDGE_EVERY) ---------------------------
+
+
+from device.nextup_agent.stall_music import SongCounter  # noqa: E402
+
+
+def test_every_fifth_new_song_brings_a_nudge_skipped_or_not():
+    c = SongCounter(5)
+    due = [c.song(f"spotify:track:{i}") for i in range(1, 12)]
+    assert due == [None, None, None, None, 5, None, None, None, None, 10, None]
+    assert c.song("spotify:track:11") is None and c.count == 11        # the same song again (repeat) counts once
+    c.reset()
+    assert c.count == 0 and SongCounter(0).song("x") is None           # 0 turns the nudge off
+
+
+def test_songs_only_count_while_someone_is_showering():
+    kiosk, showering = FakeKiosk(), {"on": False}
+    music = StallMusic(LibrespotPlayer("http://x"), kiosk, in_use=lambda: showering["on"], nudge_every=2)
+    song = lambda i: {"uri": f"t{i}", "title": "T", "artist": "A", "album": None, "duration_s": 200,  # noqa: E731
+                      "position_s": 0, "playing": True}
+    music.publish(song(1))                                    # stall free: doesn't count
+    showering["on"] = True
+    music.new_shower()                                        # a shower starts: from zero
+    music.publish(song(1))
+    assert kiosk.state.get("music_nudge") is None
+    music.publish(song(2))
+    nudge = kiosk.state["music_nudge"]
+    assert (nudge["songs"], nudge["level"]) == (2, 1) and nudge["until"] > 0
+    music.publish(song(3))
+    music.publish(song(4))
+    assert (kiosk.state["music_nudge"]["songs"], kiosk.state["music_nudge"]["level"]) == (4, 2)  # firmer
+    music.new_shower()                                        # the shower ends: the pop-up goes
+    assert kiosk.state["music_nudge"] is None and music.counter.count == 0
+
+
+def test_the_nudge_setting(tmp_path):
+    assert load(ENV).music_nudge_every == 5
+    assert load({**ENV, "MUSIC_NUDGE_EVERY": "0"}).music_nudge_every == 0

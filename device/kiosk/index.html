@@ -233,6 +233,22 @@
   #hold-hint { font-size: 17px; line-height: 1.35; color: var(--ink); }
   #hold-hint b { color: var(--accent); }
   #no-hold { font-size: 18px; color: var(--muted); margin-top: 18px; }
+  /* The "shower faster" nudge every few songs (experimental, MUSIC_NUDGE_EVERY) */
+  #nudge { border: 10px solid var(--bright); gap: 10px;
+           background-color: #e8f3fb; background-image: radial-gradient(circle at 25% 40%, #ffffff 0%, #e8f3fb 55%, #cfe5f3 100%); }
+  #nudge.level-2 { border-color: #e08a3c; background-image: radial-gradient(circle at 25% 40%, #fffaf5 0%, #ffeedd 55%, #ffd9bf 100%); }
+  #nudge.level-3 { border-color: var(--accent); background-image: radial-gradient(circle at 25% 40%, #fff7f0 0%, #ffe6d4 55%, #ffd2b3 100%); }
+  #nudge .who { width: 250px; height: 330px; flex: none; }
+  #nudge .content { flex: 1; min-width: 0; }
+  #nudge .kicker { color: var(--bright); font-size: 15px; }
+  #nudge.level-2 .kicker, #nudge.level-3 .kicker { color: var(--accent); }
+  #nudge h1 { font-size: 44px; font-weight: 700; line-height: 1.05; margin: 8px 0 10px; color: var(--navy); text-wrap: balance; }
+  #nudge .msg { font-size: 21px; line-height: 1.35; color: var(--ink); margin: 0 0 16px; text-wrap: pretty; }
+  #nudge .msg b { color: var(--accent); }
+  #nudge .left { margin-top: 18px; height: 6px; border-radius: 6px; background: rgba(0, 48, 135, 0.12); overflow: hidden; }
+  #nudge .left i { display: block; height: 100%; background: var(--bright); border-radius: 6px; }
+  #nudge.level-2 .left i, #nudge.level-3 .left i { background: var(--accent); }
+  #nudge.show .content { animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
   #thanks, #boot { flex-direction: column; text-align: center; background: radial-gradient(circle at 50% 35%, #ffffff 0%, #e6f2fa 55%, #cfe5f3 100%); }
   #thanks .who, #boot .who { width: 260px; height: 270px; }
   #thanks h1 { font-size: 56px; margin: 0 0 4px; color: var(--navy); }
@@ -420,6 +436,16 @@
       <div id="no-hold" hidden>They've been told this is on your screen. Thanks!</div>
     </div>
   </div>
+  <div class="overlay" id="nudge">
+    <div class="who" id="nudge-lion"></div>
+    <div class="content">
+      <div class="kicker" id="nudge-kicker"></div>
+      <h1 id="nudge-title"></h1>
+      <p class="msg" id="nudge-msg"></p>
+      <div class="chips" id="nudge-chips"></div>
+      <div class="left"><i id="nudge-left"></i></div>
+    </div>
+  </div>
   <div class="overlay" id="thanks"><div class="who" id="thanks-lion"></div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
   <div class="overlay show" id="boot"><div class="who" id="boot-lion"></div><span class="brand">NextUp</span><p id="boot-text">Waking up the stall screen…</p></div>
 </div>
@@ -564,6 +590,16 @@
         <path d="M-20 14L-26 22M20 14L26 22" stroke="#C75000" stroke-width="5" stroke-linecap="round"/></g></g>
       <path d="M20 250q-10-14 0-28M8 256q-16-22 0-42" stroke="#C75000" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.6"/>
       <g transform="translate(200 80)">${sparkle(0, 0, 1.1, 0, '#C75000')}</g>`),
+    // Shower-faster nudge: headphones on, a paw up, a ticking stopwatch.
+    nudge: () => svg(250, 330, `
+      ${shadow(125, 310, 80)}
+      ${place(25, 92, 1.05, lion({ hat: 'phones', eyes: 'wide', mouth: 'o', arm: 'up', anim: 'bob' }))}
+      <g class="shake"><g transform="translate(60 296)">
+        <rect x="-6" y="-48" width="12" height="9" rx="3" fill="#003087"/>
+        <circle r="30" cy="-12" fill="#fff" stroke="#003087" stroke-width="6"/>
+        <rect class="hand-spin" x="-2" y="-34" width="4" height="22" rx="2" fill="#C75000" style="transform-origin: 0px -12px"/>
+        <circle r="4" cy="-12" fill="#003087"/></g></g>
+      ${note(200, 70, 0)}${note(30, 120, 1.1)}${note(215, 170, 2)}`),
     // Thanks: jumping for joy, hearts.
     thanks: () => svg(260, 270, `
       ${shadow(130, 258, 70)}
@@ -598,6 +634,7 @@
   $('ly-scene').innerHTML = SCENES.music()
   $('hurry-lion').innerHTML = SCENES.alarm()
   $('thanks-lion').innerHTML = SCENES.thanks()
+  $('nudge-lion').innerHTML = SCENES.nudge()
   $('boot-lion').innerHTML = SCENES.sleep()
   $('bubbles').replaceChildren(...[[40, 26, 14], [150, 18, 20], [330, 30, 9], [520, 22, 16], [640, 34, 11], [740, 16, 22]].map(([x, s, secs], i) => {
     const b = document.createElement('span')
@@ -796,6 +833,29 @@
     $('ly-gesture-hint').hidden = !(np.local && state.hand_hold !== false)
   }
 
+  // The "shower faster" nudge: firmer each time, with this shower's own time and water.
+  const NUDGES = [
+    ['Like music in the shower?', ['Then shower a little faster, or ', el('b', { textContent: 'you\'ll lose control of the shower music' }), '!']],
+    ['That\'s a whole playlist!', ['Others are waiting for their turn. Finish up soon to ', el('b', { textContent: 'keep control of your music' }), '.']],
+    ['Encore\'s over, superstar!', ['Please wrap up now, or ', el('b', { textContent: 'the shower music won\'t be yours to control' }), '.']],
+  ]
+  function showNudge(nudge, now) {
+    const level = Math.min(NUDGES.length, Math.max(1, nudge.level || 1))
+    once('nudge', `${nudge.songs}/${nudge.until}`, () => {
+      const [title, msg] = NUDGES[level - 1]
+      $('nudge').className = `overlay show level-${level}`
+      $('nudge-kicker').replaceChildren(icon('note'), el('span', { textContent: `${nudge.songs} songs this shower` }))
+      $('nudge-title').textContent = title
+      $('nudge-msg').replaceChildren(...msg.map((part) => (typeof part === 'string' ? document.createTextNode(part) : part.cloneNode(true))))
+      const secs = state.since ? Math.max(0, (now - new Date(state.since)) / 1000) : 0, w = water(secs)
+      const chips = [chip('clock', '', `${Math.floor(secs / 60)} min in the shower`), chip('drop', '', `${gallons(w.gal)} gal of water`)]
+      if (state.waiting) chips.push(chip('person', '', `${people(state.waiting)} waiting`))
+      $('nudge-chips').replaceChildren(...chips)
+      drawn.nudgeTotal = Math.max(1, nudge.until * 1000 - now)
+    })
+    $('nudge-left').style.width = `${Math.max(0, Math.min(100, ((nudge.until * 1000 - now) / drawn.nudgeTotal) * 100))}%`
+  }
+
   // Radar gestures for the shower's own music: a ring while a hand is up, then a toast.
   function showGesture(now) {
     const g = state.local_music?.now_playing && !state.notify ? state.gesture || 0 : 0
@@ -845,6 +905,11 @@
       $('ring').style.strokeDashoffset = String(502.65 * (1 - hold))
       $('ring-secs').textContent = hold > 0 ? Math.max(0, Math.ceil(secs * (1 - hold))) : secs
     }
+
+    // Every few songs (MUSIC_NUDGE_EVERY), the lion asks them to shower faster. Hurry and Thanks come first.
+    const nudge = state.music_nudge, nudging = !hurry && !thanks && nudge && nudge.until * 1000 > now
+    $('nudge').classList.toggle('show', !!nudging)
+    if (nudging) showNudge(nudge, now)
 
     // The cycling pages. When the shower's own music starts, go straight to its lyrics.
     const localUri = state.local_music?.now_playing?.uri || null

@@ -93,7 +93,8 @@ class Agent:
         # Experimental: the shower's own music (MUSIC=spotify). None leaves everything as before.
         player = (SpotifyWebPlayer(cfg.spotify_client_id, cfg.spotify_token_file) if cfg.music == "spotify-web"
                   else LibrespotPlayer(cfg.music_api) if cfg.music == "spotify" else None)
-        self.stall_music = StallMusic(player, self.kiosk) if player else None
+        self.stall_music = (StallMusic(player, self.kiosk, in_use=lambda: self.presence.state == "in_use",
+                                       nudge_every=cfg.music_nudge_every) if player else None)
         if self.stall_music:  # the hint on the screen: how to get your music on it
             self.kiosk.publish(music_hint="Spotify (lyrics show here)" if cfg.music == "spotify-web"
                                else f"Spotify → {cfg.music_device_name}" if cfg.music_device_name else "")
@@ -111,9 +112,13 @@ class Agent:
         for kind, value in self.presence.update(reading, now):
             if kind == "session.start":
                 self.uplink.enqueue("session.start")
+                if self.stall_music:
+                    self.stall_music.new_shower()
                 self.kiosk.publish(stall_state="in_use", since=now_iso(), reserved_until=None)
             elif kind == "session.end":
                 self.uplink.enqueue("session.end")
+                if self.stall_music:
+                    self.stall_music.new_shower()
                 self.set_notify(None, stall_state="free", since=now_iso())
             elif kind == "hold.progress":
                 self.kiosk.publish(hold=value)

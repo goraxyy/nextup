@@ -6,6 +6,20 @@ stall screen, and pauses or skips with a hand raised to the radar.
 **This is an experiment on its own branch (`experiment/spotify-music`), not on `master`.**
 It's off unless `MUSIC=spotify` is set, and everything below can be undone (see "Going back").
 
+## "Shower faster" nudge
+
+Music makes showers longer, so every `MUSIC_NUDGE_EVERY` songs in one shower (5 by default)
+the lion pops up for 9 seconds: "Like music in the shower? Then shower a little faster, or
+you'll lose control of the shower music!" At 10 songs it gets firmer, and from 15 on it asks
+them to wrap up now. It shows their minutes in the shower, the water used, and how many
+people are waiting.
+
+- Every new song counts, played to the end or skipped. A song on repeat counts once.
+- The count starts at zero with each shower, and only counts while the stall is in use.
+- A Hurry pop-up or "Thanks!" always comes first.
+- It's a message only: nothing actually takes the music away.
+- `MUSIC_NUDGE_EVERY=0` turns it off.
+
 ## Two modes
 
 - **`MUSIC=spotify-web` (use this one).** The official Spotify app plays on the phone, and the
