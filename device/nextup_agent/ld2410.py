@@ -157,7 +157,8 @@ class LD2410Sensor:
             try:
                 with serial.Serial(self.port, self.baud, timeout=SAMPLE_S / 2) as port:
                     log.info("LD2410C on %s at %d baud", self.port, self.baud)
-                    parser, next_sample, warned_at = FrameParser(), time.monotonic(), 0.0
+                    opened_at = time.monotonic()
+                    parser, next_sample, warned_at = FrameParser(), opened_at, 0.0
                     while True:
                         for frame in parser.feed(port.read(256)):
                             self.frame, self.frame_at = frame, time.monotonic()
@@ -167,7 +168,8 @@ class LD2410Sensor:
                         next_sample = now + SAMPLE_S
                         reading = self.sample(now)
                         if reading is None:
-                            if now - warned_at > 30:
+                            # Warn only after STALE_S of real silence, not before the first frame arrives.
+                            if now - max(opened_at, self.frame_at) > STALE_S and now - warned_at > 30:
                                 log.warning("no data from the LD2410C on %s: check TX → GPIO15 (pin 10), 5V and GND",
                                             self.port)
                                 warned_at = now
