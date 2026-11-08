@@ -34,7 +34,9 @@ it, but where the person isn't normally within `HOLD_MAX_CM`.
 The HLK-LD2410C 24 GHz mmWave radar also sees someone standing still, which the HC-SR04 can
 miss. With `PRESENCE_SENSOR=ld2410c` the radar decides whether the stall is in use, and the
 HC-SR04 is only used for the hand-hold (radar distances never count as a hold). Everything
-else (the 20 s / 30 s timers, events, the screen) works the same.
+else (the 20 s / 30 s timers, events, the screen) works the same. To run with the radar alone,
+unplug the HC-SR04 and set `ULTRASONIC=off`: the Notify pop-up then just tells the person inside
+that someone's waiting, without asking for a hand-hold.
 
 | LD2410C | Pi 4 | Physical pin |
 |---|---|---|
@@ -97,6 +99,7 @@ laptop, `scripts/pi_env.py s1` prints a filled-in copy with the stall's token.
 | `RADAR_MAX_CM`, `RADAR_MIN_ENERGY` | 150, 30 | Radar targets farther or weaker than this don't count |
 | `RADAR_MIN_CM` | 0 | Radar targets closer than this don't count (a plastic cover that flexes) |
 | `RADAR_DEBUG` | off | Log what the radar sees once a second (`journalctl -u nextup-agent -f`) |
+| `ULTRASONIC` | on | `off` (with the radar only): leave the HC-SR04 out entirely. There's no hand-hold then, so a Notify pop-up can't be acknowledged; the requester sees "on their screen", then "no answer" |
 | `FAKE_SENSOR` | off | Type `in`, `out` or `hold` instead of using the sensor |
 
 ## Install, calibrate, update

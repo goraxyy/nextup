@@ -131,6 +131,18 @@ def test_settings_pick_the_presence_sensor():
         load({**ENV, "PRESENCE_SENSOR": "lidar"})
 
 
+def test_the_hc_sr04_can_be_left_out_when_the_radar_decides_presence(tmp_path):
+    from device.nextup_agent.agent import Agent
+
+    env = {**RADAR_ENV, "ULTRASONIC": "off", "NEXTUP_DATA_DIR": str(tmp_path)}
+    agent = Agent(load(env))
+    assert [type(s).__name__ for s in agent.sensors] == ["LD2410Sensor"]   # its GPIO pins are never opened
+    assert agent.kiosk.state["hand_hold"] is False                          # the pop-up won't ask for a hold
+    assert Agent(load({**RADAR_ENV, "NEXTUP_DATA_DIR": str(tmp_path)})).kiosk.state["hand_hold"] is True
+    with pytest.raises(SystemExit, match="ULTRASONIC=off needs PRESENCE_SENSOR=ld2410c"):
+        load({**ENV, "ULTRASONIC": "off"})
+
+
 def test_radar_starts_and_ends_sessions_with_the_same_timers():
     p = Presence(load(RADAR_ENV))
     assert "session.start" not in kinds(p, RADAR_IN, 0, 19)

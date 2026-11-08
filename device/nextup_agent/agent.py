@@ -52,20 +52,23 @@ def uptime_s() -> int | None:
 class Agent:
     def __init__(self, cfg: Config) -> None:
         if cfg.fake_sensor:  # the fake sensor plays the HC-SR04 for presence and hand-hold
-            cfg = dataclasses.replace(cfg, presence_sensor="ultrasonic")
+            cfg = dataclasses.replace(cfg, presence_sensor="ultrasonic", ultrasonic=True)
         self.cfg = cfg
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
         self.kiosk = Kiosk(cfg)
+        self.kiosk.publish(hand_hold=cfg.ultrasonic)  # the screen only asks for a hand-hold if one can happen
         self.uplink = Uplink(cfg.api, cfg.device_token, cfg.data_dir)
         self.presence = Presence(cfg)
         # self.sensor decides presence (and drives the screen's "sensor" dot); every sensor in
-        # self.sensors feeds on_reading. With the radar, the HC-SR04 is only there for the hand-hold.
+        # self.sensors feeds on_reading. With the radar, the HC-SR04 is only there for the hand-hold,
+        # and ULTRASONIC=off leaves it out (its GPIO pins are never touched).
         ultrasonic = (FakeSensor() if cfg.fake_sensor
-                      else UltrasonicSensor(cfg.trigger_pin, cfg.echo_pin, cfg.range_cm, cfg.sample_hz))
+                      else UltrasonicSensor(cfg.trigger_pin, cfg.echo_pin, cfg.range_cm, cfg.sample_hz)
+                      if cfg.ultrasonic else None)
         if cfg.presence_sensor == "ld2410c":
             self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy,
                                        cfg.radar_min_cm, cfg.radar_debug)
-            self.sensors = [self.sensor, ultrasonic]
+            self.sensors = [self.sensor] + ([ultrasonic] if ultrasonic else [])
         else:
             self.sensor = ultrasonic
             self.sensors = [ultrasonic]
@@ -156,7 +159,7 @@ class Agent:
         for sensor in self.sensors:
             sensor.start(loop, self.on_reading)
         cfg = self.cfg
-        hc_sr04 = f"HC-SR04 TRIG {cfg.trigger_pin} ECHO {cfg.echo_pin}"
+        hc_sr04 = f"HC-SR04 TRIG {cfg.trigger_pin} ECHO {cfg.echo_pin}" if cfg.ultrasonic else "off (ULTRASONIC=off)"
         sensors = ("fake sensor" if cfg.fake_sensor
                    else f"presence: LD2410C on {cfg.radar_port}, hand-hold: {hc_sr04}" if cfg.presence_sensor == "ld2410c"
                    else hc_sr04)

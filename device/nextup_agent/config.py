@@ -40,6 +40,9 @@ class Config:
     radar_min_energy: int = 30    # weaker radar echoes (0-100) are ignored
     radar_min_cm: int = 0         # radar targets closer than this (e.g. a flexing plastic cover) are ignored
     radar_debug: bool = False     # log what the radar sees once a second, for tuning
+    # With the radar, the HC-SR04 is only for the hand-hold. ULTRASONIC=off leaves it out entirely
+    # (unplugged): no hand-hold, so the screen's Notify pop-up can't be acknowledged.
+    ultrasonic: bool = True
     reading_every_s: float = 5.0
     heartbeat_every_s: float = 30.0
 
@@ -57,6 +60,9 @@ def load(env: dict | None = None) -> Config:
     presence_sensor = env.get("PRESENCE_SENSOR", "").strip().lower() or "ultrasonic"
     if presence_sensor not in PRESENCE_SENSORS:
         raise SystemExit(f"PRESENCE_SENSOR must be one of: {', '.join(PRESENCE_SENSORS)} (got {presence_sensor!r})")
+    ultrasonic = env.get("ULTRASONIC", "").strip().lower() not in ("0", "off", "false", "no")
+    if not ultrasonic and presence_sensor != "ld2410c":
+        raise SystemExit("ULTRASONIC=off needs PRESENCE_SENSOR=ld2410c: without the radar, the HC-SR04 is the only sensor")
     return Config(
         api=env["NEXTUP_API"].rstrip("/"),
         stall=env["NEXTUP_STALL"],
@@ -86,4 +92,5 @@ def load(env: dict | None = None) -> Config:
         radar_min_energy=_num(env, "RADAR_MIN_ENERGY", 30, int),
         radar_min_cm=_num(env, "RADAR_MIN_CM", 0, int),
         radar_debug=env.get("RADAR_DEBUG", "").lower() in ("1", "true", "yes"),
+        ultrasonic=ultrasonic,
     )

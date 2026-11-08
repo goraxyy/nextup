@@ -33,6 +33,7 @@ class Kiosk:
             "thanks_until": 0,     # epoch seconds: show "They'll know you've seen it"
             "reserved_until": None,
             "hold": 0.0,
+            "hand_hold": True,     # False when no sensor can see a hand-hold (ULTRASONIC=off)
             "sensor_ok": False,
             "online": False,
             "chime": 0,            # bumped to make the screen chime

@@ -44,8 +44,8 @@
   <div class="overlay" id="notify">
     <div>
       <h1>Someone's waiting for a shower</h1>
-      <p>Hold your hand up near the sensor for 2 seconds to let them know you've seen this.</p>
-      <svg class="ring" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
+      <p id="notify-hint">Hold your hand up near the sensor for 2 seconds to let them know you've seen this.</p>
+      <svg class="ring" id="ring-svg" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
         <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/></svg>
     </div>
   </div>
@@ -89,6 +89,12 @@
     if (left > 0) $('reserved').textContent = `Held for the next person in line · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
 
     $('notify').classList.toggle('show', !!state.notify)
+    // Without a hand-hold sensor (ULTRASONIC=off), don't ask for a hand-hold that can't be seen.
+    const canHold = state.hand_hold !== false
+    $('notify-hint').textContent = canHold
+      ? "Hold your hand up near the sensor for 2 seconds to let them know you've seen this."
+      : 'They can see that this is on your screen. No rush.'
+    $('ring-svg').style.display = canHold ? '' : 'none'
     $('ring').style.strokeDashoffset = String(502.65 * (1 - (state.hold || 0)))
     $('thanks').classList.toggle('show', !state.notify && state.thanks_until * 1000 > now)
   }
