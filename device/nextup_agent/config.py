@@ -57,6 +57,9 @@ class Config:
     # (unplugged): no hand-hold, so the screen's Notify pop-up can't be acknowledged.
     ultrasonic: bool = True
     reading_every_s: float = 5.0
+    # No readings from the presence sensor for this long (unplugged, loose wire) while the stall is
+    # in use: end the session, so the stall doesn't stay "In use" forever. 0: never.
+    sensor_lost_s: float = 60.0
     heartbeat_every_s: float = 30.0
     screen_every_s: float = 300.0  # how often to fetch the stall screen's content (events)
     # Experimental shower music (stall_music.py): "spotify" plays through go-librespot on this
@@ -147,6 +150,7 @@ def load(env: dict | None = None) -> Config:
         hold_s=_num(env, "HOLD_SECONDS", 5.0),
         sample_hz=_num(env, "SAMPLE_HZ", 10.0),
         reading_every_s=_num(env, "READING_EVERY_SECONDS", 5.0),
+        sensor_lost_s=_num(env, "SENSOR_LOST_SECONDS", 60.0),
         heartbeat_every_s=_num(env, "HEARTBEAT_EVERY_SECONDS", 30.0),
         presence_sensor=presence_sensor,
         radar_port=env.get("RADAR_PORT") or "/dev/serial0",

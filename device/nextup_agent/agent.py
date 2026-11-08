@@ -176,6 +176,23 @@ class Agent:
     def sensor_ok(self) -> bool:
         return time.monotonic() - self.sensor.last_reading_at < 5
 
+    def check_sensor_lost(self, now: float) -> None:
+        """No readings for SENSOR_LOST_SECONDS while in use: end the session rather than stay stuck."""
+        if not self.cfg.sensor_lost_s or self.presence.state != "in_use":
+            return
+        if now - self.sensor.last_reading_at < self.cfg.sensor_lost_s:
+            return
+        log.warning("no readings from the presence sensor for %.0f s: ending the session so the stall "
+                    "doesn't stay in use", now - self.sensor.last_reading_at)
+        self.presence.force("free")
+        self.uplink.enqueue("session.end")
+        if self.stall_music:
+            self.stall_music.new_shower()
+        if self.goal:
+            self.goal.stop()
+            self.kiosk.publish(goal_ask=None, shower_goal=None)
+        self.set_notify(None, stall_state="free", since=now_iso())
+
     # Supabase → screen ------------------------------------------------------------
 
     async def on_message(self, event: str, payload: dict) -> None:
@@ -229,6 +246,7 @@ class Agent:
     async def readings(self) -> None:
         while True:
             await asyncio.sleep(self.cfg.reading_every_s)
+            self.check_sensor_lost(time.monotonic())
             r = self.last_reading
             if r is not None and self.sensor_ok():
                 present = (r.present if r.present is not None

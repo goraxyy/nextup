@@ -369,3 +369,29 @@ def test_a_lowered_hand_drains_the_ring_instead_of_restarting_it():
     assert 0.3 < p.hold_progress < 0.45                  # about 0.6 - 0.2: kept most of it
     assert kinds(p, hand, 4.6, 7.0, step=0.1).count("input.hold") == 0   # 2.4 s more: not yet
     assert kinds(p, hand, 7.1, 8.2, step=0.1).count("input.hold") == 1   # about 3 s more, not 5: no restart
+
+
+# A sensor that goes silent (unplugged) --------------------------------------------------
+
+
+def test_a_silent_sensor_ends_the_session_instead_of_staying_in_use(tmp_path):
+    import time as _time
+
+    from device.nextup_agent.agent import Agent
+
+    agent = Agent(load({**RADAR_ENV, "ULTRASONIC": "off", "NEXTUP_DATA_DIR": str(tmp_path)}))
+    now = _time.monotonic()
+    agent.presence.force("in_use")
+    agent.kiosk.publish(stall_state="in_use")
+    agent.sensor.last_reading_at = now - 30                  # quiet for 30 s: maybe a brief glitch, wait
+    agent.check_sensor_lost(now)
+    assert agent.presence.state == "in_use"
+    agent.sensor.last_reading_at = now - 61                  # over a minute: the sensor is gone
+    agent.check_sensor_lost(now)
+    assert agent.presence.state == "free" and agent.kiosk.state["stall_state"] == "free"
+    assert agent.uplink.pending() >= 1                        # session.end goes to the API too
+    off = Agent(load({**RADAR_ENV, "ULTRASONIC": "off", "NEXTUP_DATA_DIR": str(tmp_path), "SENSOR_LOST_SECONDS": "0"}))
+    off.presence.force("in_use")
+    off.sensor.last_reading_at = now - 600
+    off.check_sensor_lost(now)
+    assert off.presence.state == "in_use"

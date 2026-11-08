@@ -338,6 +338,7 @@ class LD2410Sensor:
         self.setup, self.data_dir = setup, data_dir
         self.gate_cm: int | None = None
         self.calibration: Calibration | None = None
+        self.lost = False  # went silent (unplugged): set it up again when it's back
         self.min_cm, self.debug = min_cm, debug
         self.hold, self.hold_max_cm, self.hold_min_energy = hold, hold_max_cm, hold_min_energy
         self.last_reading_at = 0.0
@@ -455,10 +456,18 @@ class LD2410Sensor:
                     opened_at = time.monotonic()
                     parser, next_sample, warned_at, checked_at = FrameParser(), opened_at, 0.0, 0.0
                     while True:
+                        got = False
                         for frame in parser.feed(port.read(256)):
-                            self.frame, self.frame_at = frame, time.monotonic()
+                            self.frame, self.frame_at, got = frame, time.monotonic(), True
                             if self.calibration:
                                 self.calibration.add(frame)
+                        if got and self.lost:
+                            # Power came back (re-plugged): its settings are in its memory, but
+                            # engineering mode isn't, so set it up again.
+                            self.lost = False
+                            log.info("LD2410C is back on %s: setting it up again", self.port)
+                            self.apply_setup(port)
+                            parser = FrameParser()
                         now = time.monotonic()
                         if now - checked_at >= 1.0:
                             checked_at = now
@@ -472,6 +481,8 @@ class LD2410Sensor:
                         reading = self.sample(now)
                         if reading is None:
                             # Warn only after STALE_S of real silence, not before the first frame arrives.
+                            if self.frame_at and now - self.frame_at > STALE_S:
+                                self.lost = True
                             if now - max(opened_at, self.frame_at) > STALE_S and now - warned_at > 30:
                                 log.warning("no data from the LD2410C on %s: check TX → GPIO15 (pin 10), 5V and GND",
                                             self.port)
