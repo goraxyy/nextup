@@ -1,6 +1,7 @@
 # Stall agent (Raspberry Pi)
 
-Runs on each stall's Pi. It reads the HC-SR04 distance sensor, decides when the stall is in use,
+Runs on each stall's Pi. It reads the HC-SR04 distance sensor (and optionally an LD2410C radar
+for presence; see below), decides when the stall is in use,
 sends events to the API (`/api/device/events`), listens for this stall's messages on Supabase
 Realtime (`device:<stall>`), and drives the stall screen at http://localhost:8080.
 
@@ -28,6 +29,50 @@ Mount the sensor beside the screen, pointing into the stall, so a person showeri
 `PRESENT_MAX_CM` and the empty stall reads farther (or nothing). Keep it where a hand can reach
 it, but where the person isn't normally within `HOLD_MAX_CM`.
 
+## Optional: LD2410C radar for presence
+
+The HLK-LD2410C 24 GHz mmWave radar also sees someone standing still, which the HC-SR04 can
+miss. With `PRESENCE_SENSOR=ld2410c` the radar decides whether the stall is in use, and the
+HC-SR04 is only used for the hand-hold (radar distances never count as a hold). Everything
+else (the 20 s / 30 s timers, events, the screen) works the same.
+
+| LD2410C | Pi 4 | Physical pin |
+|---|---|---|
+| VCC | 5V | 4 |
+| GND | GND | 14 |
+| TX | GPIO15 (UART RXD) | 10 |
+| RX | GPIO14 (UART TXD), optional: only for setup commands | 8 |
+| OUT | not used | |
+
+**No voltage divider on the radar.** It runs on 5 V but its UART pins are 3.3 V, so TX goes
+straight to GPIO15. A 1 kΩ / 2 kΩ divider would drop it to about 2.2 V, too close to the Pi's
+input threshold at 256000 baud. (To be sure, measure TX to GND with a multimeter while it's
+powered: about 3.3 V. Only if it reads 5 V does it need the divider.) The HC-SR04's ECHO still
+needs its divider.
+
+The Pi's UART must be on GPIO14/15 with Bluetooth moved off it, once per Pi:
+
+```bash
+sudo raspi-config nonint do_serial_cons 1     # no login console on the serial port
+sudo raspi-config nonint do_serial_hw 0       # serial port on
+echo 'dtoverlay=disable-bt' | sudo tee -a /boot/firmware/config.txt
+sudo systemctl disable --now hciuart
+sudo usermod -aG dialout "$USER" && sudo reboot  # /dev/serial0 → /dev/ttyAMA0 afterwards
+```
+
+Mount the radar beside the screen facing into the stall, at chest height, away from the
+shower head and curtain (moving water and fabric can show up as targets). Then tune it:
+
+```bash
+.venv-pi/bin/python -m device.nextup_agent.calibrate --radar   # stop the agent first if it uses the radar
+```
+
+Each line shows the moving and still targets, their energy (0-100), and the occupancy score.
+Set `RADAR_MAX_CM` just past where someone showers, so targets beyond the stall don't count, and
+`RADAR_MIN_ENERGY` above what the empty stall shows. The filter is the same as the team's Arduino
+test: about 0.7 s of targets to count as present, about 3 s without them to count as gone; the
+agent's `ENTER_SECONDS` and `LEAVE_SECONDS` then apply on top.
+
 ## Settings
 
 `/etc/nextup/agent.env` (see [infra/pi/agent.env.example](../infra/pi/agent.env.example)). On the
@@ -41,6 +86,9 @@ laptop, `scripts/pi_env.py s1` prints a filled-in copy with the stall's token.
 | `PRESENT_MAX_CM` | 120 | Closer than this means someone is in the stall |
 | `HOLD_MAX_CM`, `HOLD_SECONDS` | 15, 2 | Hand-hold: this close, this long |
 | `ENTER_SECONDS`, `LEAVE_SECONDS` | 20, 30 | Presence hysteresis |
+| `PRESENCE_SENSOR` | ultrasonic | `ld2410c`: the radar decides presence, the HC-SR04 only the hand-hold |
+| `RADAR_PORT`, `RADAR_BAUD` | /dev/serial0, 256000 | The radar's serial port |
+| `RADAR_MAX_CM`, `RADAR_MIN_ENERGY` | 150, 30 | Radar targets farther or weaker than this don't count |
 | `FAKE_SENSOR` | off | Type `in`, `out` or `hold` instead of using the sensor |
 
 ## Install, calibrate, update

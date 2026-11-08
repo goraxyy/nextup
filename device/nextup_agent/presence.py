@@ -1,8 +1,11 @@
-"""Presence (FREE ↔ IN USE with hysteresis) and the hand-hold detector, from distances.
+"""Presence (FREE ↔ IN USE with hysteresis) and the hand-hold detector.
 
-The HC-SR04 points into the stall. An empty stall reads far (or no echo); a person reads
-closer than PRESENT_MAX_CM; a hand held up near the sensor reads closer than HOLD_MAX_CM.
-Calibrate both per stall with `python -m device.nextup_agent.calibrate`.
+With PRESENCE_SENSOR=ultrasonic (the default), the HC-SR04 does both: an empty stall reads far
+(or no echo), a person reads closer than PRESENT_MAX_CM, and a hand held up near the sensor
+reads closer than HOLD_MAX_CM. Calibrate with `python -m device.nextup_agent.calibrate`.
+
+With PRESENCE_SENSOR=ld2410c, the radar's readings (Reading.present set) decide presence and
+the HC-SR04's readings are only used for the hand-hold. Radar distances never count as a hold.
 """
 
 from .config import Config
@@ -34,10 +37,19 @@ class Presence:
 
     def update(self, reading: Reading, now: float) -> list[tuple[str, float | None]]:
         out: list[tuple[str, float | None]] = []
+        radar = reading.present is not None
+        if radar or self.cfg.presence_sensor != "ld2410c":
+            out += self._presence(reading, now)
+        if not radar:
+            out += self._hold(reading.distance_cm, now)
+        return out
+
+    def _presence(self, reading: Reading, now: float) -> list[tuple[str, float | None]]:
+        out: list[tuple[str, float | None]] = []
         cfg = self.cfg
         d = reading.distance_cm
 
-        present = d is not None and d <= cfg.present_max_cm
+        present = reading.present if reading.present is not None else (d is not None and d <= cfg.present_max_cm)
         if present:
             self.absent_since = None
             self.present_since = self.present_since if self.present_since is not None else now
@@ -51,7 +63,11 @@ class Presence:
         elif self.state == "in_use" and not present and now - self.absent_since >= cfg.leave_s:
             self.state = "free"
             out.append(("session.end", None))
+        return out
 
+    def _hold(self, d: float | None, now: float) -> list[tuple[str, float | None]]:
+        out: list[tuple[str, float | None]] = []
+        cfg = self.cfg
         near = d is not None and d <= cfg.hold_max_cm
         if near:
             self.hold_last_near = now

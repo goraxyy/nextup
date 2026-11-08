@@ -2,3 +2,4 @@
 # install script makes the venv with --system-site-packages so it can use them.
 httpx>=0.27
 websockets>=13
+pyserial>=3.5   # LD2410C radar on the UART (PRESENCE_SENSOR=ld2410c)

@@ -5,6 +5,7 @@ import pathlib
 from dataclasses import dataclass
 
 REQUIRED = ("NEXTUP_API", "NEXTUP_STALL", "NEXTUP_DEVICE_TOKEN", "SUPABASE_URL", "SUPABASE_PUBLISHABLE_KEY")
+PRESENCE_SENSORS = ("ultrasonic", "ld2410c")
 
 
 @dataclass(frozen=True)
@@ -30,6 +31,13 @@ class Config:
     hold_max_cm: int = 15
     hold_s: float = 2.0
     sample_hz: float = 10.0
+    # Which sensor decides presence: "ultrasonic" (HC-SR04) or "ld2410c" (radar on the UART).
+    # With the radar, the HC-SR04 still does the hand-hold.
+    presence_sensor: str = "ultrasonic"
+    radar_port: str = "/dev/serial0"
+    radar_baud: int = 256000
+    radar_max_cm: int = 150       # radar targets farther than this are outside the stall
+    radar_min_energy: int = 30    # weaker radar echoes (0-100) are ignored
     reading_every_s: float = 5.0
     heartbeat_every_s: float = 30.0
 
@@ -44,6 +52,9 @@ def load(env: dict | None = None) -> Config:
     missing = [name for name in REQUIRED if not env.get(name)]
     if missing:
         raise SystemExit("missing settings: " + ", ".join(missing))
+    presence_sensor = env.get("PRESENCE_SENSOR", "").strip().lower() or "ultrasonic"
+    if presence_sensor not in PRESENCE_SENSORS:
+        raise SystemExit(f"PRESENCE_SENSOR must be one of: {', '.join(PRESENCE_SENSORS)} (got {presence_sensor!r})")
     return Config(
         api=env["NEXTUP_API"].rstrip("/"),
         stall=env["NEXTUP_STALL"],
@@ -66,4 +77,9 @@ def load(env: dict | None = None) -> Config:
         sample_hz=_num(env, "SAMPLE_HZ", 10.0),
         reading_every_s=_num(env, "READING_EVERY_SECONDS", 5.0),
         heartbeat_every_s=_num(env, "HEARTBEAT_EVERY_SECONDS", 30.0),
+        presence_sensor=presence_sensor,
+        radar_port=env.get("RADAR_PORT") or "/dev/serial0",
+        radar_baud=_num(env, "RADAR_BAUD", 256000, int),
+        radar_max_cm=_num(env, "RADAR_MAX_CM", 150, int),
+        radar_min_energy=_num(env, "RADAR_MIN_ENERGY", 30, int),
     )

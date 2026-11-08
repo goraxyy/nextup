@@ -1,5 +1,8 @@
 """HC-SR04 ultrasonic distance sensor on GPIO, plus a fake sensor for testing.
 
+With PRESENCE_SENSOR=ld2410c, the LD2410C radar (ld2410.py) decides presence and the HC-SR04
+is only used for the hand-hold.
+
 Wiring (BCM pin numbers, the defaults):
     VCC  → 5V (pin 2)
     GND  → GND (pin 6)
@@ -24,6 +27,9 @@ log = logging.getLogger("nextup.sensor")
 @dataclass(frozen=True)
 class Reading:
     distance_cm: float | None  # None: nothing within range
+    # Set by the LD2410C radar (ld2410.py), which decides presence itself. None means an HC-SR04
+    # distance: presence comes from PRESENT_MAX_CM, and it can also be a hand-hold.
+    present: bool | None = None
 
 
 class UltrasonicSensor:

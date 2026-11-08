@@ -1,10 +1,12 @@
 """Wires the parts together.
 
-HC-SR04 distances → presence → events to the API (queued) and state to the screen
+HC-SR04 distances (or the LD2410C radar for presence) → presence → events to the API (queued)
+and state to the screen
 Supabase Realtime (device:<stall>) → pop-ups, re-chimes and reservations on the screen
 """
 
 import asyncio
+import dataclasses
 import logging
 import os
 import socket
@@ -15,6 +17,7 @@ import httpx
 from . import __version__
 from .config import Config
 from .kiosk import Kiosk
+from .ld2410 import LD2410Sensor
 from .presence import Presence
 from .sensor import FakeSensor, Reading, UltrasonicSensor
 from .realtime import DeviceChannel, SupabaseSession
@@ -48,13 +51,23 @@ def uptime_s() -> int | None:
 
 class Agent:
     def __init__(self, cfg: Config) -> None:
+        if cfg.fake_sensor:  # the fake sensor plays the HC-SR04 for presence and hand-hold
+            cfg = dataclasses.replace(cfg, presence_sensor="ultrasonic")
         self.cfg = cfg
         cfg.data_dir.mkdir(parents=True, exist_ok=True)
         self.kiosk = Kiosk(cfg)
         self.uplink = Uplink(cfg.api, cfg.device_token, cfg.data_dir)
         self.presence = Presence(cfg)
-        self.sensor = (FakeSensor() if cfg.fake_sensor
-                       else UltrasonicSensor(cfg.trigger_pin, cfg.echo_pin, cfg.range_cm, cfg.sample_hz))
+        # self.sensor decides presence (and drives the screen's "sensor" dot); every sensor in
+        # self.sensors feeds on_reading. With the radar, the HC-SR04 is only there for the hand-hold.
+        ultrasonic = (FakeSensor() if cfg.fake_sensor
+                      else UltrasonicSensor(cfg.trigger_pin, cfg.echo_pin, cfg.range_cm, cfg.sample_hz))
+        if cfg.presence_sensor == "ld2410c":
+            self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy)
+            self.sensors = [self.sensor, ultrasonic]
+        else:
+            self.sensor = ultrasonic
+            self.sensors = [ultrasonic]
         self.session = SupabaseSession(cfg.supabase_url, cfg.supabase_key, cfg.data_dir)
         self.channel = DeviceChannel(cfg, self.session)
         self.last_reading: Reading | None = None
@@ -62,7 +75,8 @@ class Agent:
     # Sensor → presence ------------------------------------------------------------
 
     def on_reading(self, reading: Reading, now: float) -> None:
-        self.last_reading = reading
+        if (reading.present is not None) == (self.cfg.presence_sensor == "ld2410c"):
+            self.last_reading = reading  # the presence sensor's latest, for the history readings
         for kind, value in self.presence.update(reading, now):
             if kind == "session.start":
                 self.uplink.enqueue("session.start")
@@ -132,14 +146,20 @@ class Agent:
             await asyncio.sleep(self.cfg.reading_every_s)
             r = self.last_reading
             if r is not None and self.sensor_ok():
-                present = r.distance_cm is not None and r.distance_cm <= self.cfg.present_max_cm
+                present = (r.present if r.present is not None
+                           else r.distance_cm is not None and r.distance_cm <= self.cfg.present_max_cm)
                 self.uplink.enqueue("reading", presence=present, distance_cm=r.distance_cm, water=False)
 
     async def run(self) -> None:
         loop = asyncio.get_running_loop()
-        self.sensor.start(loop, self.on_reading)
-        log.info("NextUp agent %s for stall %s → %s (%s)", __version__, self.cfg.stall, self.cfg.api,
-                 "fake sensor" if self.cfg.fake_sensor else f"HC-SR04 TRIG {self.cfg.trigger_pin} ECHO {self.cfg.echo_pin}")
+        for sensor in self.sensors:
+            sensor.start(loop, self.on_reading)
+        cfg = self.cfg
+        hc_sr04 = f"HC-SR04 TRIG {cfg.trigger_pin} ECHO {cfg.echo_pin}"
+        sensors = ("fake sensor" if cfg.fake_sensor
+                   else f"presence: LD2410C on {cfg.radar_port}, hand-hold: {hc_sr04}" if cfg.presence_sensor == "ld2410c"
+                   else hc_sr04)
+        log.info("NextUp agent %s for stall %s → %s (%s)", __version__, cfg.stall, cfg.api, sensors)
         async with httpx.AsyncClient() as client:
             await asyncio.gather(
                 self.kiosk.run(),
