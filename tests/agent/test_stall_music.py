@@ -282,16 +282,17 @@ def test_the_lion_celebrates_a_real_shower_on_the_way_out(tmp_path):
 
     from device.nextup_agent.agent import Agent
 
-    agent = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)}))
+    on = {**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "CELEBRATE_SECONDS": "10"}
+    agent = Agent(load(on))
     started = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=6)).isoformat()
     agent.kiosk.publish(stall_state="in_use", since=started)
     agent.celebrate()
     assert 355 <= agent.kiosk.state["celebrate"]["secs"] <= 365
-    blip = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)}))     # 20 s in the stall: a sensor blip
+    blip = Agent(load(on))                                            # 20 s in the stall: a sensor blip
     blip.kiosk.publish(stall_state="in_use", since=(dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=20)).isoformat())
     blip.celebrate()
     assert blip.kiosk.state["celebrate"] is None
-    off = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "CELEBRATE_SECONDS": "0"}))
+    off = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)}))      # off unless CELEBRATE_SECONDS is set
     off.kiosk.publish(stall_state="in_use", since=started)
     off.celebrate()
     assert off.kiosk.state["celebrate"] is None

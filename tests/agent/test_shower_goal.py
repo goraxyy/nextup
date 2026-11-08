@@ -62,7 +62,7 @@ def test_the_question_comes_with_the_shower_and_the_goal_reaches_the_celebration
 
     from device.nextup_agent.agent import Agent
 
-    agent = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)}))
+    agent = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "GOAL_ASK_SECONDS": "15", "CELEBRATE_SECONDS": "10"}))
     t = 0.0
     while "goal_ask" not in agent.kiosk.state or agent.kiosk.state["goal_ask"] is None:  # someone steps in
         agent.on_reading(Reading(80, present=True, hold_near=False), t)
@@ -84,8 +84,10 @@ def test_the_question_comes_with_the_shower_and_the_goal_reaches_the_celebration
 def test_the_question_can_be_turned_off_and_its_options_set(tmp_path):
     from device.nextup_agent.agent import Agent
 
-    assert Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "GOAL_ASK_SECONDS": "0"})).goal is None
-    assert Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "RADAR_HOLD": "off"})).goal is None  # no way to answer
+    assert Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)})).goal is None   # off unless GOAL_ASK_SECONDS is set
+    assert Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "GOAL_ASK_SECONDS": "15"})).goal is not None
+    assert Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "GOAL_ASK_SECONDS": "15",
+                       "RADAR_HOLD": "off"})).goal is None                                   # no way to answer
     assert load({**ENV, "GOAL_OPTIONS": "4,8"}).goal_options == (4, 8)
     with pytest.raises(SystemExit, match="GOAL_OPTIONS"):
         load({**ENV, "GOAL_OPTIONS": "5,10,15,20,25"})

@@ -28,7 +28,7 @@ When a shower starts, the lion asks for a goal: Quick 5 min, Normal 10, Long 15
 While the question shows, a raised hand only answers it: music gestures wait, and a Hurry
 pop-up still comes first. With a goal set, the status page counts down to it ("6 min left",
 then "2 min over"), and the exit celebration compares against it ("Done in 9 of your 10 min").
-`GOAL_ASK_SECONDS=0` turns it off. It needs a hand sensor: the radar with `RADAR_HOLD`, or
+It's off unless `GOAL_ASK_SECONDS` is set (15 is a good value). It needs a hand sensor: the radar with `RADAR_HOLD`, or
 the HC-SR04.
 
 ## Exit celebration (`CELEBRATE_SECONDS`, not tied to music)
@@ -40,7 +40,7 @@ with their time and water use:
 - Otherwise: "Fresh and clean! An average shower here is 14 min. Can you beat it next time?"
   It's never a scolding.
 
-`CELEBRATE_SECONDS=0` turns it off.
+It's off unless `CELEBRATE_SECONDS` is set (10 is a good value).
 
 ## "Shower faster" nudge
 

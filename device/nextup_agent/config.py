@@ -67,11 +67,12 @@ class Config:
     spotify_client_id: str = ""   # MUSIC=spotify-web: the Spotify developer app's Client ID
     music_nudge_every: int = 5    # every this many songs in one shower, the lion asks them to hurry (0: never)
     music_shampoo_after: int = 2  # after this many songs, "Let's shampoo!" and a wave of bubbles (0: never)
-    # Experimental: when someone leaves after a real shower, the lion celebrates for this long (0: never).
-    celebrate_s: float = 10.0
-    # Experimental: when a shower starts, ask "How long will your shower be?" for this long,
-    # answered with a hand raised to the sensor (shower_goal.py). 0: never ask.
-    goal_ask_s: float = 15.0
+    # Experimental, off unless set: when someone leaves after a real shower, the lion celebrates
+    # for this long (CELEBRATE_SECONDS=10).
+    celebrate_s: float = 0.0
+    # Experimental, off unless set: when a shower starts, ask "How long will your shower be?" for
+    # this long, answered with a hand raised to the sensor (shower_goal.py; GOAL_ASK_SECONDS=15).
+    goal_ask_s: float = 0.0
     goal_options: tuple[int, ...] = (5, 10, 15)
     spotify_token_file: pathlib.Path | None = None  # its refresh token, from scripts/spotify_login.py
     page_status_s: float = 10.0    # cycling pages on the stall screen
@@ -172,8 +173,8 @@ def load(env: dict | None = None) -> Config:
         spotify_client_id=env.get("SPOTIFY_CLIENT_ID", "").strip(),
         music_nudge_every=_num(env, "MUSIC_NUDGE_EVERY", 5, int),
         music_shampoo_after=_num(env, "MUSIC_SHAMPOO_AFTER", 2, int),
-        celebrate_s=_num(env, "CELEBRATE_SECONDS", 10.0),
-        goal_ask_s=_num(env, "GOAL_ASK_SECONDS", 15.0),
+        celebrate_s=_num(env, "CELEBRATE_SECONDS", 0.0),
+        goal_ask_s=_num(env, "GOAL_ASK_SECONDS", 0.0),
         goal_options=goal_options,
         spotify_token_file=pathlib.Path(env.get("SPOTIFY_TOKEN_FILE")
                                         or pathlib.Path(env.get("NEXTUP_DATA_DIR", "/var/lib/nextup")) / "spotify-token.json"),
