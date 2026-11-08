@@ -66,6 +66,9 @@ class Config:
     music_device_name: str = ""  # the Spotify Connect name, for the screen's hint
     spotify_client_id: str = ""   # MUSIC=spotify-web: the Spotify developer app's Client ID
     music_nudge_every: int = 5    # every this many songs in one shower, the lion asks them to hurry (0: never)
+    music_shampoo_after: int = 2  # after this many songs, "Let's shampoo!" and a wave of bubbles (0: never)
+    # Experimental: when someone leaves after a real shower, the lion celebrates for this long (0: never).
+    celebrate_s: float = 10.0
     spotify_token_file: pathlib.Path | None = None  # its refresh token, from scripts/spotify_login.py
     page_status_s: float = 10.0    # cycling pages on the stall screen
     page_event_s: float = 8.0
@@ -158,6 +161,8 @@ def load(env: dict | None = None) -> Config:
         music_device_name=env.get("MUSIC_DEVICE_NAME", ""),
         spotify_client_id=env.get("SPOTIFY_CLIENT_ID", "").strip(),
         music_nudge_every=_num(env, "MUSIC_NUDGE_EVERY", 5, int),
+        music_shampoo_after=_num(env, "MUSIC_SHAMPOO_AFTER", 2, int),
+        celebrate_s=_num(env, "CELEBRATE_SECONDS", 10.0),
         spotify_token_file=pathlib.Path(env.get("SPOTIFY_TOKEN_FILE")
                                         or pathlib.Path(env.get("NEXTUP_DATA_DIR", "/var/lib/nextup")) / "spotify-token.json"),
     )

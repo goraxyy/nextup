@@ -249,6 +249,46 @@
   #nudge .left i { display: block; height: 100%; background: var(--bright); border-radius: 6px; }
   #nudge.level-2 .left i, #nudge.level-3 .left i { background: var(--accent); }
   #nudge.show .content { animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+  /* Exit celebration (experimental, CELEBRATE_SECONDS) */
+  #celebrate { gap: 10px; background-color: #eaf6ee;
+               background-image: radial-gradient(circle at 25% 40%, #ffffff 0%, #eaf6ee 55%, #cfeedd 100%); border: 10px solid var(--green); }
+  #celebrate.over { border-color: var(--bright); background-image: radial-gradient(circle at 25% 40%, #ffffff 0%, #e8f3fb 55%, #cfe5f3 100%); }
+  #celebrate .who { width: 250px; height: 330px; flex: none; }
+  #celebrate .content { flex: 1; min-width: 0; }
+  #celebrate .kicker { color: var(--green); font-size: 15px; }
+  #celebrate.over .kicker { color: var(--bright); }
+  #celebrate h1 { font-size: 52px; font-weight: 700; line-height: 1.02; margin: 8px 0 10px; color: var(--navy); }
+  #celebrate .msg { font-size: 21px; line-height: 1.35; color: var(--ink); margin: 0 0 16px; text-wrap: pretty; }
+  #celebrate .msg b { color: var(--green); }
+  #celebrate.over .msg b { color: var(--bright); }
+  #celebrate .left { margin-top: 18px; height: 6px; border-radius: 6px; background: rgba(0, 48, 135, 0.12); overflow: hidden; }
+  #celebrate .left i { display: block; height: 100%; background: var(--green); border-radius: 6px; }
+  #celebrate.over .left i { background: var(--bright); }
+  #celebrate.show .content { animation: pop 0.45s cubic-bezier(0.2, 1.4, 0.4, 1); }
+
+  /* The shampoo moment (experimental, MUSIC_SHAMPOO_AFTER): a cloud, a bottle, then bubbles */
+  .say { animation: say-in 0.5s cubic-bezier(0.2, 1.6, 0.4, 1) both; transform-box: fill-box; transform-origin: 30% 100%; }
+  @keyframes say-in { from { transform: scale(0.2); opacity: 0; } }
+  .bottle { animation: pour 2.6s ease-in-out 0.5s both; transform-box: fill-box; transform-origin: 50% 80%; }
+  @keyframes pour { 0% { transform: translateY(-40px) rotate(0); opacity: 0; } 18% { transform: translateY(0) rotate(0); opacity: 1; }
+                    40%, 85% { transform: rotate(-125deg); } 100% { transform: rotate(-125deg); } }
+  .squirt { animation: squirt 0.9s ease-in infinite; transform-box: fill-box; transform-origin: center; opacity: 0; }
+  @keyframes squirt { 0% { transform: translate(0, 0) scale(0.6); opacity: 0; } 20% { opacity: 1; }
+                      100% { transform: translate(-26px, 38px) scale(1.1); opacity: 0; } }
+  .suds { animation: suds 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both; transform-box: fill-box; transform-origin: 50% 100%; }
+  @keyframes suds { from { transform: scale(0); } }
+  #foam { position: absolute; left: -20px; right: -20px; top: 0; height: 150%; z-index: 4; pointer-events: none;
+          transform: translateY(100%); visibility: hidden;
+          background:
+            radial-gradient(circle at 50% 8%, rgba(255, 255, 255, 0) 0 60px, transparent 61px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0) 0%, rgba(240, 248, 255, 0.96) 12%, rgba(232, 244, 252, 0.98) 100%); }
+  #foam.go { visibility: visible; animation: foamwave 3.6s cubic-bezier(0.45, 0, 0.35, 1) forwards; }
+  @keyframes foamwave { 0% { transform: translateY(100%); } 38% { transform: translateY(-22%); } 62% { transform: translateY(-27%); }
+                        100% { transform: translateY(-115%); opacity: 0.2; } }
+  #foam span { position: absolute; border-radius: 50%; border: 2px solid rgba(108, 172, 228, 0.55);
+               background: radial-gradient(circle at 32% 28%, #ffffff 0 18%, rgba(255, 255, 255, 0.75) 30%, rgba(185, 217, 235, 0.45) 70%, rgba(255, 255, 255, 0.85) 100%);
+               box-shadow: inset -4px -6px 10px rgba(108, 172, 228, 0.25); animation: wobble 1.4s ease-in-out infinite alternate; }
+  @keyframes wobble { to { transform: translate(6px, -8px) scale(1.04); } }
   #thanks, #boot { flex-direction: column; text-align: center; background: radial-gradient(circle at 50% 35%, #ffffff 0%, #e6f2fa 55%, #cfe5f3 100%); }
   #thanks .who, #boot .who { width: 260px; height: 270px; }
   #thanks h1 { font-size: 56px; margin: 0 0 4px; color: var(--navy); }
@@ -446,6 +486,17 @@
       <div class="left"><i id="nudge-left"></i></div>
     </div>
   </div>
+  <div id="foam" aria-hidden="true"></div>
+  <div class="overlay" id="celebrate">
+    <div class="who" id="celebrate-lion"></div>
+    <div class="content">
+      <div class="kicker" id="celebrate-kicker"></div>
+      <h1 id="celebrate-title"></h1>
+      <p class="msg" id="celebrate-msg"></p>
+      <div class="chips" id="celebrate-chips"></div>
+      <div class="left"><i id="celebrate-left"></i></div>
+    </div>
+  </div>
   <div class="overlay" id="thanks"><div class="who" id="thanks-lion"></div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
   <div class="overlay show" id="boot"><div class="who" id="boot-lion"></div><span class="brand">NextUp</span><p id="boot-text">Waking up the stall screen…</p></div>
 </div>
@@ -600,6 +651,31 @@
         <rect class="hand-spin" x="-2" y="-34" width="4" height="22" rx="2" fill="#C75000" style="transform-origin: 0px -12px"/>
         <circle r="4" cy="-12" fill="#003087"/></g></g>
       ${note(200, 70, 0)}${note(30, 120, 1.1)}${note(215, 170, 2)}`),
+    // Shampoo time: a speech cloud, a bottle that pours, suds on the mane.
+    shampoo: () => svg(230, 300, `
+      ${shadow(115, 288, 70)}
+      ${place(15, 78, 1, lion({ hat: 'phones', eyes: 'happy', mouth: 'grin', anim: 'sway' }))}
+      <g class="suds" style="animation-delay: 1.6s">
+        ${[[86, 98, 13], [104, 90, 15], [124, 96, 13], [96, 84, 10], [116, 82, 11], [134, 104, 9], [76, 106, 9]].map(([x, y, r]) =>
+          `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff" stroke="#B9D9EB" stroke-width="2"/>`).join('')}
+        <circle cx="100" cy="86" r="3" fill="#B9D9EB"/><circle cx="121" cy="94" r="2.5" fill="#B9D9EB"/></g>
+      <g class="bottle"><g transform="translate(168 58)">
+        <rect x="-15" y="-8" width="30" height="48" rx="9" fill="#F27A8C"/>
+        <rect x="-15" y="6" width="30" height="16" fill="#fff" opacity="0.85"/>
+        <text x="0" y="17" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="8" fill="#C75000">SUDS</text>
+        <rect x="-7" y="-18" width="14" height="11" rx="3" fill="#003087"/><rect x="-3" y="-24" width="6" height="7" rx="2" fill="#003087"/></g></g>
+      ${[0, 0.3, 0.6].map((d) => `<circle class="squirt" style="animation-delay:${(1.6 + d).toFixed(1)}s" cx="146" cy="70" r="6" fill="#fff" stroke="#F27A8C" stroke-width="2"/>`).join('')}
+      <g class="say"><path d="M14 10h124a14 14 0 0 1 14 14v18a14 14 0 0 1-14 14H62l-16 14 2-14H14A14 14 0 0 1 0 42V24a14 14 0 0 1 14-14z"
+          fill="#fff" stroke="#003087" stroke-width="2.5"/>
+        <text x="76" y="39" text-anchor="middle" font-family="Montserrat, Arial" font-weight="700" font-size="17" fill="#003087">Let's shampoo!</text></g>
+      ${bubble(30, 250, 8, 0.4)}${bubble(200, 230, 10, 1.2)}${bubble(50, 190, 6, 2)}`),
+    // Exit celebration: jumping, confetti, sparkles.
+    celebrate: () => svg(250, 330, `
+      ${[[20, 0], [60, 0.7], [110, 1.4], [160, 0.3], [210, 1.9], [90, 2.4], [235, 1.1]].map(([x, d], i) =>
+        `<rect class="confetti" style="animation-delay:${d}s" x="${x}" y="-10" width="8" height="13" rx="2" fill="${['#228848', '#C75000', '#0077C8', '#F27A8C'][i % 4]}"/>`).join('')}
+      ${shadow(125, 310, 80)}
+      ${place(25, 92, 1.05, lion({ eyes: 'happy', mouth: 'grin', arm: 'wave', anim: 'jump' }))}
+      ${sparkle(30, 110, 1.2, 0, '#228848')}${sparkle(225, 90, 1, 0.6)}${sparkle(215, 220, 0.9, 1.1, '#228848')}`),
     // Thanks: jumping for joy, hearts.
     thanks: () => svg(260, 270, `
       ${shadow(130, 258, 70)}
@@ -635,6 +711,14 @@
   $('hurry-lion').innerHTML = SCENES.alarm()
   $('thanks-lion').innerHTML = SCENES.thanks()
   $('nudge-lion').innerHTML = SCENES.nudge()
+  $('celebrate-lion').innerHTML = SCENES.celebrate()
+  // The bubble wave: a tall sheet of foam with bubbles of every size (fixed layout, built once).
+  $('foam').replaceChildren(...Array.from({ length: 110 }, (_, i) => {
+    const b = document.createElement('span'), size = 28 + ((i * 53) % 110), x = (i * 137) % 840, y = 20 + ((i * 89) % 680)
+    Object.assign(b.style, { width: `${size}px`, height: `${size}px`, left: `${x - size / 2}px`, top: `${y}px`,
+                             animationDelay: `${-(i % 7) * 0.2}s` })
+    return b
+  }))
   $('boot-lion').innerHTML = SCENES.sleep()
   $('bubbles').replaceChildren(...[[40, 26, 14], [150, 18, 20], [330, 30, 9], [520, 22, 16], [640, 34, 11], [740, 16, 22]].map(([x, s, secs], i) => {
     const b = document.createElement('span')
@@ -833,6 +917,36 @@
     $('ly-gesture-hint').hidden = !(np.local && state.hand_hold !== false)
   }
 
+  // The exit celebration: praise for a quick shower, a kind "beat it next time" otherwise.
+  function showCelebrate(cel, now) {
+    once('celebrate', `${cel.secs}/${cel.until}`, () => {
+      const avg = state.insights?.stats?.avg_shower_minutes || 15, mins = cel.secs / 60, w = water(cel.secs)
+      const quick = mins < avg - 0.5, saved = (avg - mins) * w.gpm
+      $('celebrate').className = `overlay show${quick ? '' : ' over'}`
+      $('celebrate-kicker').replaceChildren(icon('sparkle'), el('span', { textContent: 'All done!' }))
+      $('celebrate-title').textContent = quick ? 'Speedy cub!' : 'Fresh and clean!'
+      $('celebrate-msg').replaceChildren(...(quick
+        ? ['You saved about ', el('b', { textContent: `${gallons(saved)} gal of water` }),
+           ` (${Math.round(saved * 7.57)} water bottles) compared with an average shower. Thank you!`]
+        : ['An average shower here is ', el('b', { textContent: `${Math.round(avg)} min` }), '. Can you beat it next time?']))
+      $('celebrate-chips').replaceChildren(chip('clock', '', `${Math.max(1, Math.round(mins))} min in the shower`),
+                                           chip('drop', '', `${gallons(w.gal)} gal of water`))
+      drawn.celebrateTotal = Math.max(1, cel.until * 1000 - now)
+    })
+    $('celebrate-left').style.width = `${Math.max(0, Math.min(100, ((cel.until * 1000 - now) / drawn.celebrateTotal) * 100))}%`
+  }
+
+  // The shampoo moment: the lion's cloud and bottle on the lyrics page, then bubbles over everything.
+  function showShampoo(now) {
+    const sh = state.shampoo, on = !!(sh && sh.until * 1000 > now && state.local_music?.now_playing)
+    once('shampoo', on ? `on/${sh.until}` : 'off', () => {
+      $('ly-scene').innerHTML = on ? SCENES.shampoo() : SCENES.music()
+      clearTimeout(drawn.foamTimer)
+      $('foam').classList.remove('go')
+      if (on) drawn.foamTimer = setTimeout(() => { void $('foam').offsetWidth; $('foam').classList.add('go') }, 3000)
+    })
+  }
+
   // The "shower faster" nudge: firmer each time, with this shower's own time and water.
   const NUDGES = [
     ['Like music in the shower?', ['Then shower a little faster, or ', el('b', { textContent: 'you\'ll lose control of the shower music' }), '!']],
@@ -906,8 +1020,13 @@
       $('ring-secs').textContent = hold > 0 ? Math.max(0, Math.ceil(secs * (1 - hold))) : secs
     }
 
-    // Every few songs (MUSIC_NUDGE_EVERY), the lion asks them to shower faster. Hurry and Thanks come first.
-    const nudge = state.music_nudge, nudging = !hurry && !thanks && nudge && nudge.until * 1000 > now
+    // On the way out (CELEBRATE_SECONDS), the lion celebrates. Hurry and Thanks come first.
+    const cel = state.celebrate, celebrating = !hurry && !thanks && cel && cel.until * 1000 > now
+    $('celebrate').classList.toggle('show', !!celebrating)
+    if (celebrating) showCelebrate(cel, now)
+
+    // Every few songs (MUSIC_NUDGE_EVERY), the lion asks them to shower faster.
+    const nudge = state.music_nudge, nudging = !hurry && !thanks && !celebrating && nudge && nudge.until * 1000 > now
     $('nudge').classList.toggle('show', !!nudging)
     if (nudging) showNudge(nudge, now)
 
@@ -926,6 +1045,7 @@
     if (page.kind === 'best') showBest(now)
     if (page.kind === 'lyrics' && music()) showLyrics()
     showGesture(now)
+    showShampoo(now)
     once('dots', `${list.length}/${pageIndex}`, () =>
       $('pagedots').replaceChildren(...list.map((_, i) => el('i', { className: i === pageIndex ? 'on' : '' }))))
 

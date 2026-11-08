@@ -11,8 +11,9 @@ Either way the agent:
 
 - polls the player for what's playing and shows it on the screen's lyrics page, with synced
   lyrics fetched from LRCLIB (the same free source the backend uses);
-- counts the songs started during each shower and, every MUSIC_NUDGE_EVERY songs (5 by
-  default), has the lion ask them to shower faster or lose control of the music;
+- counts the songs started during each shower: when the third starts (MUSIC_SHAMPOO_AFTER=2)
+  the lion says "Let's shampoo!" and bubbles fill the screen, and every MUSIC_NUDGE_EVERY
+  songs (5 by default) it asks them to shower faster or lose control of the music;
 - reads a hand raised to the radar as a gesture while music is on: up briefly, then away,
   plays or pauses; held for NEXT_S, skips to the next song. A Hurry pop-up always wins: while
   it shows, a raised hand answers the Hurry instead.
@@ -35,6 +36,7 @@ LRCLIB = "https://lrclib.net/api"
 LRC_STAMP = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
 DRIFT_S = 1.5          # a jump in position bigger than this is a seek; smaller is polling jitter
 NUDGE_S = 9.0          # how long the "shower faster" pop-up stays up
+SHAMPOO_S = 7.0        # the "Let's shampoo!" moment: cloud, bottle, then a wave of bubbles
 
 
 def parse_lrc(text: str) -> list[list]:
@@ -217,14 +219,13 @@ class Gesture:
 
 
 class SongCounter:
-    """Counts the songs started during one shower, for the "shower faster" nudge.
+    """Counts the songs started during one shower (for the shampoo moment and the nudge).
 
     Every new song counts, played to the end or skipped; a song on repeat counts once.
-    song() returns the count when a nudge is due (every `every` songs), else None.
+    song() returns the new count when a new song starts, else None.
     """
 
-    def __init__(self, every: int) -> None:
-        self.every = every
+    def __init__(self) -> None:
         self.count = 0
         self.last_uri: str | None = None
 
@@ -232,20 +233,21 @@ class SongCounter:
         self.count, self.last_uri = 0, None
 
     def song(self, uri: str | None) -> int | None:
-        if not self.every or not uri or uri == self.last_uri:
+        if not uri or uri == self.last_uri:
             return None
         self.last_uri = uri
         self.count += 1
-        return self.count if self.count % self.every == 0 else None
+        return self.count
 
 
 class StallMusic:
     """Keeps the screen's `local_music` in step with the player and sends it gesture commands."""
 
-    def __init__(self, player, kiosk, in_use=lambda: True, nudge_every: int = 0) -> None:
+    def __init__(self, player, kiosk, in_use=lambda: True, nudge_every: int = 0, shampoo_after: int = 0) -> None:
         self.player, self.kiosk = player, kiosk
-        self.in_use = in_use  # songs only count toward the nudge while someone's in the stall
-        self.counter = SongCounter(nudge_every)
+        self.in_use = in_use  # songs only count while someone's in the stall
+        self.counter = SongCounter()
+        self.nudge_every, self.shampoo_after = nudge_every, shampoo_after
         self.gesture = Gesture()
         self.client: httpx.AsyncClient | None = None
         self.track: dict | None = None      # what the screen shows now
@@ -269,10 +271,13 @@ class StallMusic:
                 and abs(old["started_at_ms"] - started_ms) < DRIFT_S * 1000):
             started_ms = old["started_at_ms"]
         self.track = {**np, "started_at_ms": started_ms, "local": True}
-        due = self.counter.song(np["uri"]) if self.in_use() else None
-        if due:
-            log.info("music nudge: %d songs this shower", due)
-            self.kiosk.publish(music_nudge={"songs": due, "level": due // self.counter.every,
+        count = self.counter.song(np["uri"]) if self.in_use() else None
+        if count and self.shampoo_after and count == self.shampoo_after + 1:
+            log.info("music: shampoo time (song %d)", count)
+            self.kiosk.publish(shampoo={"until": time.time() + SHAMPOO_S})
+        if count and self.nudge_every and count % self.nudge_every == 0:
+            log.info("music nudge: %d songs this shower", count)
+            self.kiosk.publish(music_nudge={"songs": count, "level": count // self.nudge_every,
                                             "until": time.time() + NUDGE_S})
         if self.track != old:
             self.kiosk.publish(local_music={"now_playing": self.track, "lyrics": self.lyrics.get(np["uri"])})
@@ -280,7 +285,7 @@ class StallMusic:
     def new_shower(self) -> None:
         """A shower started or ended: count songs from zero, and drop any nudge on screen."""
         self.counter.reset()
-        self.kiosk.publish(music_nudge=None)
+        self.kiosk.publish(music_nudge=None, shampoo=None)
 
     async def fetch_lyrics(self, np: dict) -> None:
         uri = np["uri"]

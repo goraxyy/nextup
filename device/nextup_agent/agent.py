@@ -94,7 +94,8 @@ class Agent:
         player = (SpotifyWebPlayer(cfg.spotify_client_id, cfg.spotify_token_file) if cfg.music == "spotify-web"
                   else LibrespotPlayer(cfg.music_api) if cfg.music == "spotify" else None)
         self.stall_music = (StallMusic(player, self.kiosk, in_use=lambda: self.presence.state == "in_use",
-                                       nudge_every=cfg.music_nudge_every) if player else None)
+                                       nudge_every=cfg.music_nudge_every,
+                                       shampoo_after=cfg.music_shampoo_after) if player else None)
         if self.stall_music:  # the hint on the screen: how to get your music on it
             self.kiosk.publish(music_hint="Spotify (lyrics show here)" if cfg.music == "spotify-web"
                                else f"Spotify → {cfg.music_device_name}" if cfg.music_device_name else "")
@@ -119,6 +120,7 @@ class Agent:
                 self.uplink.enqueue("session.end")
                 if self.stall_music:
                     self.stall_music.new_shower()
+                self.celebrate()
                 self.set_notify(None, stall_state="free", since=now_iso())
             elif kind == "hold.progress":
                 self.kiosk.publish(hold=value)
@@ -128,6 +130,19 @@ class Agent:
                     self.set_notify(None, thanks_until=time.time() + 4)
         if self.stall_music and reading.hold_near is not None:  # radar gestures for the music
             self.stall_music.on_hand(reading.hold_near, now, hurry_showing=self.presence.hold_armed)
+
+    def celebrate(self) -> None:
+        """Experimental (CELEBRATE_SECONDS): the lion thanks them on the way out, with their time
+        and water. Stretches under a minute are sensor blips, not showers, so they get nothing."""
+        since = self.kiosk.state.get("since")
+        if not self.cfg.celebrate_s or not since or self.kiosk.state.get("stall_state") != "in_use":
+            return
+        try:
+            secs = (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(since)).total_seconds()
+        except ValueError:
+            return
+        if secs >= 60:
+            self.kiosk.publish(celebrate={"secs": round(secs), "until": time.time() + self.cfg.celebrate_s})
 
     def sensor_ok(self) -> bool:
         return time.monotonic() - self.sensor.last_reading_at < 5

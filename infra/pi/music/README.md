@@ -6,6 +6,25 @@ stall screen, and pauses or skips with a hand raised to the radar.
 **This is an experiment on its own branch (`experiment/spotify-music`), not on `master`.**
 It's off unless `MUSIC=spotify` is set, and everything below can be undone (see "Going back").
 
+## Shampoo time
+
+When the third song of a shower starts (after `MUSIC_SHAMPOO_AFTER` songs, 2 by default), a
+cloud by the headphone lion on the lyrics page says "Let's shampoo!". The lion pours a shampoo
+bottle, suds land on its mane, and then a wave of bubbles rises from the bottom, covers the whole
+screen for a moment and floats away (about 7 seconds in all). It happens once per shower.
+`MUSIC_SHAMPOO_AFTER=0` turns it off.
+
+## Exit celebration (`CELEBRATE_SECONDS`, not tied to music)
+
+When someone leaves after a real shower (at least a minute), the lion celebrates for 10 seconds
+with their time and water use:
+
+- Under the average shower: "Speedy cub!", with the gallons saved (and that many water bottles).
+- Otherwise: "Fresh and clean! An average shower here is 14 min. Can you beat it next time?"
+  It's never a scolding.
+
+`CELEBRATE_SECONDS=0` turns it off.
+
 ## "Shower faster" nudge
 
 Music makes showers longer, so every `MUSIC_NUDGE_EVERY` songs in one shower (5 by default)

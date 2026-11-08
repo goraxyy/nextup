@@ -209,20 +209,38 @@ def test_without_a_token_file_it_says_how_to_sign_in(tmp_path):
 from device.nextup_agent.stall_music import SongCounter  # noqa: E402
 
 
-def test_every_fifth_new_song_brings_a_nudge_skipped_or_not():
-    c = SongCounter(5)
-    due = [c.song(f"spotify:track:{i}") for i in range(1, 12)]
-    assert due == [None, None, None, None, 5, None, None, None, None, 10, None]
-    assert c.song("spotify:track:11") is None and c.count == 11        # the same song again (repeat) counts once
+def test_every_new_song_counts_skipped_or_not_and_a_repeat_counts_once():
+    c = SongCounter()
+    assert [c.song(f"spotify:track:{i}") for i in range(1, 6)] == [1, 2, 3, 4, 5]
+    assert c.song("spotify:track:5") is None and c.count == 5           # the same song again (repeat)
     c.reset()
-    assert c.count == 0 and SongCounter(0).song("x") is None           # 0 turns the nudge off
+    assert c.count == 0 and c.song(None) is None
+
+
+def test_every_fifth_song_brings_a_nudge_and_zero_turns_it_off():
+    kiosk = FakeKiosk()
+    music = StallMusic(LibrespotPlayer("http://x"), kiosk, nudge_every=5)
+    for i in range(1, 11):
+        music.publish(song(i))
+        if i in (5, 10):
+            assert kiosk.state["music_nudge"]["songs"] == i
+            kiosk.state["music_nudge"] = None
+        else:
+            assert kiosk.state.get("music_nudge") is None
+    off, off_kiosk = None, FakeKiosk()
+    off = StallMusic(LibrespotPlayer("http://x"), off_kiosk, nudge_every=0)
+    for i in range(1, 11):
+        off.publish(song(i))
+    assert off_kiosk.state.get("music_nudge") is None
+
+
+def song(i):
+    return {"uri": f"t{i}", "title": "T", "artist": "A", "album": None, "duration_s": 200, "position_s": 0, "playing": True}
 
 
 def test_songs_only_count_while_someone_is_showering():
     kiosk, showering = FakeKiosk(), {"on": False}
     music = StallMusic(LibrespotPlayer("http://x"), kiosk, in_use=lambda: showering["on"], nudge_every=2)
-    song = lambda i: {"uri": f"t{i}", "title": "T", "artist": "A", "album": None, "duration_s": 200,  # noqa: E731
-                      "position_s": 0, "playing": True}
     music.publish(song(1))                                    # stall free: doesn't count
     showering["on"] = True
     music.new_shower()                                        # a shower starts: from zero
@@ -241,3 +259,39 @@ def test_songs_only_count_while_someone_is_showering():
 def test_the_nudge_setting(tmp_path):
     assert load(ENV).music_nudge_every == 5
     assert load({**ENV, "MUSIC_NUDGE_EVERY": "0"}).music_nudge_every == 0
+
+
+def test_the_shampoo_moment_comes_once_when_the_third_song_starts():
+    kiosk = FakeKiosk()
+    music = StallMusic(LibrespotPlayer("http://x"), kiosk, shampoo_after=2)
+    music.publish(song(1))
+    music.publish(song(2))
+    assert kiosk.state.get("shampoo") is None
+    music.publish(song(3))
+    assert kiosk.state["shampoo"]["until"] > 0
+    kiosk.state["shampoo"] = None
+    for i in range(4, 9):
+        music.publish(song(i))
+    assert kiosk.state["shampoo"] is None                              # once per shower
+    music.new_shower()
+    assert music.counter.count == 0
+
+
+def test_the_lion_celebrates_a_real_shower_on_the_way_out(tmp_path):
+    import datetime as dt
+
+    from device.nextup_agent.agent import Agent
+
+    agent = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)}))
+    started = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(minutes=6)).isoformat()
+    agent.kiosk.publish(stall_state="in_use", since=started)
+    agent.celebrate()
+    assert 355 <= agent.kiosk.state["celebrate"]["secs"] <= 365
+    blip = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path)}))     # 20 s in the stall: a sensor blip
+    blip.kiosk.publish(stall_state="in_use", since=(dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=20)).isoformat())
+    blip.celebrate()
+    assert blip.kiosk.state["celebrate"] is None
+    off = Agent(load({**ENV, "NEXTUP_DATA_DIR": str(tmp_path), "CELEBRATE_SECONDS": "0"}))
+    off.kiosk.publish(stall_state="in_use", since=started)
+    off.celebrate()
+    assert off.kiosk.state["celebrate"] is None
