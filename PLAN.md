@@ -8,7 +8,7 @@ to [#11](https://github.com/goraxyy/nextup/issues/11), open questions in
 [#12](https://github.com/goraxyy/nextup/issues/12)). Tick boxes there; this file is the original
 plan. Each phase ends with a **Done when** check.
 
-Hardware assumed per stall: Raspberry Pi 3, HiLink LD2410C radar, HCTG070V 7" display (no touch).
+Hardware assumed per stall: Raspberry Pi 3, HC-SR04 ultrasonic distance sensor, HCTG070V 7" display (no touch).
 One speaker per shower room on the 3.5 mm jack.
 
 Services: Tiger Data, Vercel, Supabase, Gemini API (Ask the board only), GoDaddy Registry. The
@@ -41,31 +41,34 @@ backend design is in [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 - [ ] Time sync with `chrony` on every Pi (lyric sync depends on it)
 - [ ] Identify the HCTG070V: interface (HDMI or other) and native resolution, from the label or datasheet. If it is not HDMI, flag it to the ECE side for a driver board
 - [ ] Set the display mode. Bookworm uses KMS, so set it in `cmdline.txt` (for example `video=HDMI-A-1:1024x600@60`); legacy `hdmi_cvt` lines in `config.txt` are ignored. Rotate if mounted in portrait
-- [ ] Free the full UART for the radar: `enable_uart=1` and `dtoverlay=disable-bt` in `config.txt`, remove the serial console from `cmdline.txt`. Bluetooth is not needed because audio uses the 3.5 mm jack
+- [ ] Wire the HC-SR04: VCC to 5V, GND to GND, TRIG to GPIO23, ECHO to GPIO24 through a 1 kΩ / 2 kΩ voltage divider (ECHO is 5 V; the Pi's pins take 3.3 V). See [device/README.md](device/README.md)
 - [ ] Audio: 3.5 mm jack as default output, a volume cap, a test chime
 - [ ] Minimal X session for the kiosk: `xserver-xorg`, `openbox`, `unclutter`, autologin, screen blanking off
 - [ ] Chromium kiosk: `chromium-browser --kiosk --noerrdialogs --disable-infobars --incognito http://localhost:8080`
-- [ ] systemd units: `nextup-agent.service`, `nextup-kiosk.service`, both `Restart=always`; enable the hardware watchdog
-- [ ] `infra/pi/setup.sh`: idempotent script that turns a fresh Pi into a NextUp device
-- [ ] Update path: `git pull` plus service restart, triggered by a command from the server
+- [x] systemd units: `infra/pi/nextup-agent.service` and an optional `nextup-kiosk.service`, both `Restart=always`
+- [ ] Enable the hardware watchdog
+- [x] `infra/pi/install.sh`: idempotent script that installs the agent and its services (the OS, Wi-Fi and display setup above stay manual)
+- [x] Update path: `git pull`, `./infra/pi/install.sh`, `sudo systemctl restart nextup-agent`
+- [ ] Trigger updates with a command from the server
 - [ ] Performance budget for the Pi 3: kiosk under 60% CPU, animations at 30 fps, images no larger than the screen
 
 **Done when:** a Pi powers on and shows the kiosk page full-screen within 60 s, with no cursor and no blanking.
 
 ## Phase 2: Device agent (presence and hand-hold)
 
-- [ ] LD2410C driver in `device/radar/`: read frames at 256000 baud (report header `F4 F3 F2 F1`, tail `F8 F7 F6 F5`), parse target state, moving and stationary distance and energy
-- [ ] Turn on the radar's engineering mode to read per-gate energies
-- [ ] Radar config command: max distance gate and sensitivities, saved as a per-stall profile (the HLKRadarTool phone app works for quick tuning)
-- [ ] Presence state machine: FREE → OCCUPIED after 20 s present, OCCUPIED → FREE after 30 s absent; emit `session.start` and `session.end` with timestamps
-- [ ] Hand-hold detector on the radar: a sustained energy spike in the nearest gate for 2 s during a session; emit `input.hold.progress` (0 to 1) so the screen can fill a ring, then `input.hold`. Test this first: Notify depends on it
-- [ ] Agent serves the kiosk's static build on `localhost:8080`
-- [ ] Local WebSocket server on `localhost:8765` that pushes events to the kiosk
-- [ ] Uplink client: WebSocket to the server with device token, 10 s heartbeat, exponential reconnect, and a SQLite queue that replays events after an outage
-- [ ] Calibration tools in `device/tools/`: log per-gate energies to CSV during test runs and plot them to pick thresholds; save the thresholds to the stall profile
-- [ ] Unit tests with recorded data: frame parser, state machine, hold detector
+Built in [device/](device/README.md) and tested end to end with the fake sensor; not yet run on the real Pi.
 
-**Done when:** entering the mock stall flips the state in under 25 s, and a 2 s hand-hold fires an acknowledgement, with under 5% false triggers in a 10-minute test.
+- [x] HC-SR04 driver (`device/nextup_agent/sensor.py`): gpiozero `DistanceSensor` at about 10 Hz; no echo reads as nothing there
+- [x] Presence state machine: FREE → IN USE after 20 s closer than `PRESENT_MAX_CM`, IN USE → FREE after 30 s away; sends `session.start` and `session.end`
+- [x] Hand-hold detector: something within `HOLD_MAX_CM` (15 cm) for 2 s; `hold.progress` fills the ring on the screen, then `input.hold`. Test this first on the real stall: Notify depends on it
+- [x] Agent serves the stall screen (`device/kiosk/index.html`) on `localhost:8080` and pushes state over a local WebSocket on `localhost:8765`
+- [x] Uplink: `POST /api/device/events` with the stall's token, through a SQLite queue that replays events after an outage; heartbeat every 30 s; sensor readings every 5 s
+- [x] Downlink: Supabase Realtime topic `device:<stall>` (Notify pop-up, re-chime, reserved for the next person), with stall state fetched on every reconnect
+- [x] Calibration: `python -m device.nextup_agent.calibrate` shows live distances to pick `PRESENT_MAX_CM` and `HOLD_MAX_CM`
+- [x] Unit tests: presence, hand-hold, offline queue (`tests/agent/`)
+- [ ] Run it on the real stall and tune the thresholds
+
+**Done when:** entering the real stall flips the state in under 25 s, and a 2 s hand-hold fires an acknowledgement, with under 5% false triggers in a 10-minute test.
 
 ## Phase 3: Backend (Tiger Data, Vercel, Supabase)
 
@@ -119,7 +122,7 @@ Full design: [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 - [x] Limits: one Notify per requester every 10 min; nothing identifies either side
 - [x] Deliver `notify.deliver` to the chosen device (on its `device:<id>` topic)
 - [ ] Kiosk pop-up: full-screen message, chime, music ducked in that room, hold-progress ring
-- [ ] Acknowledgement from the radar hand-hold sends `input.hold`; the requester's page shows "They've seen it" (server and website done; the Pi side is Phase 2)
+- [x] Acknowledgement from the hand-hold sends `input.hold`; the requester's page shows "They've seen it" (tested with the fake sensor; check on the real Pi)
 - [ ] No acknowledgement: one more chime at 60 s, then a small banner; log the outcome
 - [ ] Two requesters at once: queue them and target different stalls when possible
 - [x] Tests: selection rule, real stalls first, cooldowns, acknowledgement
@@ -190,7 +193,7 @@ Full design: [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 ## Phase 10: Admin, hardening and documentation
 
 - [ ] Admin page: device health (heartbeat, CPU temperature, uptime), moderation queue, problem reports (resolving one clears the stall's banner), per-device config (thresholds, quiet hours, volume, enabled modules)
-- [ ] Failure modes: server down → kiosk keeps local status and cached cards; radar unplugged → "sensor offline" screen; agent and kiosk auto-restart
+- [ ] Failure modes: server down → kiosk keeps local status and cached cards; sensor unplugged → "sensor offline" screen; agent and kiosk auto-restart
 - [ ] Security: rotate device tokens, rate limits, no personal data stored, privacy page (no cameras, no microphones)
 - [ ] Load test the WebSocket hub with 50 simulated devices
 - [ ] `CREDITS.md`: libraries, APIs, music and data sources (the handbook requires credit)
@@ -208,8 +211,8 @@ Each question has a recommended answer. Tick it once the team agrees.
   - Recommendation: if it has an HDMI port, plug it in and read the modes it reports from `/sys/class/drm/card*-HDMI-A-1/modes`. The display announces its own resolution, so usually no config is needed.
   - Design the kiosk for 1024×600 and check it at 800×480, with a layout that scales, so the UI works either way.
   - If it only has a flat ribbon connector, it needs a driver board (ECE side).
-- [ ] **Is the radar hand-hold reliable while someone is standing in the stall?**
-  - Recommendation: test it first thing in Phase 2. Someone stands 0.5–1 m away while a hand is held 10–20 cm from the radar; log per-gate energies; use the radar's 0.2 m gate setting if the firmware offers it. Mount the radar beside the screen at chest height.
+- [ ] **Is the hand-hold reliable while someone is standing in the stall?**
+  - Recommendation: test it first on the real stall. Mount the HC-SR04 beside the screen at chest height, where the person is normally more than 30 cm away; run the calibration tool while someone stands there and while a hand is held 5–10 cm in front of the sensor; set `HOLD_MAX_CM` between the two. Steam and water spray can scatter ultrasound, so check readings with the shower running.
   - Pass: 95% of holds detected and under 5% false triggers in 10 minutes.
   - Either way, build Notify so the "shown on their screen" receipt always works and the acknowledgement is an upgrade on top. A weak hand-hold then never breaks the feature.
 - [ ] **Music: popular songs or royalty-free tracks?**
@@ -220,7 +223,7 @@ Each question has a recommended answer. Tick it once the team agrees.
   - Recommendation: one per room. There is no sync problem and only one audio host. Use Snapcast only if a large room needs a second speaker.
 - [ ] **How many devices for the demo?**
   - Recommendation: at least one real stall plus one simulated stall (the simulator drives a second kiosk page on a laptop), which is enough to show "longest session" selection and lyric sync.
-  - Use two real stalls if you have two of each part. CURC lists only 2 LD2410C radars, so reserve them early if you need theirs.
+  - Use two real stalls if you have two of each part. HC-SR04s are cheap, so keep a spare.
 - [ ] **Which domain?**
   - Recommendation: `showerchor.us`. It reads "shower chorus", fits the synced lyrics, and is short. Runner-up: `prunealert.us`. Both were still unregistered when rechecked on 2026-11-07.
   - Full shortlist (all unregistered on 2026-11-07): `showerchor.us`, `prunealert.us`, `waitinginatowel.us`, `areyoudoneyet.us`, `lastsong.us`, `stallstat.us` ("stall status"), `showergeni.us` ("shower genius"), `showercirc.us` ("shower circus"), `stillinthere.us`, `getoutoftheshower.us`

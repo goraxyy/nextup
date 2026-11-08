@@ -14,7 +14,7 @@ Built at MakeCU 2026 (Creativity track).
 - **Busy hours:** the website shows when the showers are usually free and estimates the wait.
 - **Notify:** a student who is waiting taps Notify on the website. The stall with the longest
   current session gets a pop-up on its screen (real stalls before simulated ones). The person inside holds a hand up in front of the
-  radar to acknowledge, and the waiting student sees that they were notified.
+  sensor to acknowledge, and the waiting student sees that they were notified.
 - **Rush-hour heads-up:** an opt-in push notification when the showers are about to get busy and
   a stall is free right now.
 - **Report a problem:** report no hot water, a clogged drain or a broken light from the website.
@@ -32,7 +32,7 @@ Built at MakeCU 2026 (Creativity track).
 | Part | Role |
 |---|---|
 | Raspberry Pi 3 | Runs the device agent and the screen (kiosk) |
-| HiLink LD2410C mmWave radar | Presence in the stall, hand-hold acknowledgement |
+| HC-SR04 ultrasonic distance sensor | Presence in the stall, hand-hold acknowledgement |
 | HCTG070V 7" display (no touch) | The screen |
 | Speaker via 3.5 mm jack and amp (one per room) | Music, chimes, spoken content |
 
@@ -64,11 +64,10 @@ web/       Student website (Vite + React), deployed to Vercel              (buil
 sim/       One-shot device script: play a stall's Pi from the laptop       (built)
 scripts/   Room setup: floor code and a device token per stall             (built)
 tests/     Rule tests (SQL) and API tests, against local TimescaleDB       (built)
-device/    Python agent on each Pi: radar, hand-hold detection, uplink
-kiosk/     The screen UI (static web app shown in Chromium kiosk mode)
+device/    Stall agent for the Pi (HC-SR04, API, Realtime) and the stall screen (built)
 content/   Content workers: campus events, wellness, fun modules, moderation
 audio/     Room audio host: MPD, Snapcast, now-playing publisher, lyrics cache
-infra/     Pi setup scripts and systemd units
+infra/     Pi install script and systemd units                             (built)
 docs/      Use cases, backend plan, sponsor ideas
 ```
 
@@ -87,6 +86,25 @@ docs/      Use cases, backend plan, sponsor ideas
 The backend and the website are live at https://nextup-khaki.vercel.app, on the team's Tiger
 schema. Stall 1 is the real stall; Stalls 2 to 5 are moved by the SQL simulator on every tick. The
 device agent, the kiosk and the content are next; see [PLAN.md](PLAN.md).
+
+## Setting up a stall Pi
+
+The Pi runs the stall agent in [device/](device/README.md): it reads the HC-SR04, sends events to
+the API and drives the stall screen at http://localhost:8080. On the Pi, over SSH:
+
+```bash
+git clone https://github.com/goraxyy/nextup.git ~/nextup && cd ~/nextup   # or: git pull
+./infra/pi/install.sh                                     # venv, systemd unit, /etc/nextup/agent.env
+sudo nano /etc/nextup/agent.env                           # paste the output of scripts/pi_env.py s1
+sudo systemctl stop nextup-agent
+.venv-pi/bin/python -m device.nextup_agent.calibrate      # pick PRESENT_MAX_CM and HOLD_MAX_CM
+sudo systemctl restart nextup-agent && journalctl -u nextup-agent -f
+```
+
+Wire the HC-SR04 first (TRIG → GPIO23, ECHO → GPIO24 through a voltage divider; see
+[device/README.md](device/README.md)), stop any older agent that uses the same pins, and point the
+Pi's Chromium kiosk at http://localhost:8080 (or enable `nextup-kiosk.service`). To update:
+`cd ~/nextup && git pull && ./infra/pi/install.sh && sudo systemctl restart nextup-agent`.
 
 ## Run it locally
 

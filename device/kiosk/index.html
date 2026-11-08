@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NextUp stall</title>
+<style>
+  :root { --bg: #0b1220; --ink: #f8fafc; --muted: #94a3b8; --free: #22c55e; --busy: #f59e0b; --accent: #60a5fa; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); cursor: none;
+               font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  .top { position: absolute; top: 0; left: 0; right: 0; display: flex; justify-content: space-between;
+         padding: 18px 28px; font-size: 22px; color: var(--muted); }
+  .dots span { margin-left: 18px; }
+  .dot { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: #475569; margin-right: 6px; }
+  .dot.on { background: var(--free); }
+  .main { height: 100%; display: grid; place-items: center; text-align: center; }
+  .state { font-size: 120px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .state.free { color: var(--free); }
+  .state.in_use { color: var(--busy); }
+  .sub { font-size: 34px; color: var(--muted); margin-top: 18px; }
+  .banner { position: absolute; bottom: 0; left: 0; right: 0; padding: 22px; text-align: center;
+            font-size: 32px; background: #1e293b; }
+  .overlay { position: absolute; inset: 0; display: none; place-items: center; text-align: center;
+             background: var(--bg); }
+  .overlay.show { display: grid; }
+  .overlay h1 { font-size: 64px; margin: 0 0 16px; }
+  .overlay p { font-size: 30px; color: var(--muted); margin: 0 auto; max-width: 820px; }
+  .ring { width: 190px; height: 190px; margin: 34px auto 0; }
+  .ring circle { fill: none; stroke-width: 16; }
+  .ring .track { stroke: #1e293b; }
+  .ring .fill { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
+                transition: stroke-dashoffset 0.15s linear; }
+  .thanks h1 { color: var(--free); }
+</style>
+</head>
+<body>
+  <div class="top"><span id="name">Stall</span>
+    <span class="dots"><span><i class="dot" id="sensor"></i>sensor</span><span><i class="dot" id="online"></i>online</span></span>
+  </div>
+  <div class="main"><div><div class="state" id="state">…</div><div class="sub" id="sub"></div></div></div>
+  <div class="banner" id="reserved" hidden></div>
+
+  <div class="overlay" id="notify">
+    <div>
+      <h1>Someone's waiting for a shower</h1>
+      <p>Hold your hand up near the sensor for 2 seconds to let them know you've seen this.</p>
+      <svg class="ring" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
+        <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/></svg>
+    </div>
+  </div>
+  <div class="overlay thanks" id="thanks"><div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div></div>
+
+<script>
+  const $ = (id) => document.getElementById(id)
+  let state = null, lastChime = null, audio = null
+
+  function chime() {
+    try {
+      audio = audio || new AudioContext()
+      ;[660, 880].forEach((freq, i) => {
+        const osc = audio.createOscillator(), gain = audio.createGain()
+        osc.frequency.value = freq
+        gain.gain.setValueAtTime(0.0001, audio.currentTime + i * 0.25)
+        gain.gain.exponentialRampToValueAtTime(0.3, audio.currentTime + i * 0.25 + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + i * 0.25 + 0.4)
+        osc.connect(gain).connect(audio.destination)
+        osc.start(audio.currentTime + i * 0.25); osc.stop(audio.currentTime + i * 0.25 + 0.45)
+      })
+    } catch (e) { /* no audio device */ }
+  }
+
+  function render() {
+    if (!state) return
+    const now = Date.now()
+    $('name').textContent = state.stall_name || state.stall
+    $('sensor').classList.toggle('on', !!state.sensor_ok)
+    $('online').classList.toggle('on', !!state.online)
+
+    const free = state.stall_state === 'free'
+    $('state').textContent = free ? 'Free' : 'In use'
+    $('state').className = 'state ' + (free ? 'free' : 'in_use')
+    const mins = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : null
+    $('sub').textContent = free ? 'Step in whenever you like' : (mins !== null ? `${mins} min` : '')
+
+    const until = state.reserved_until ? new Date(state.reserved_until).getTime() : 0
+    const left = Math.round((until - now) / 1000)
+    $('reserved').hidden = !(free && left > 0)
+    if (left > 0) $('reserved').textContent = `Held for the next person in line · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+
+    $('notify').classList.toggle('show', !!state.notify)
+    $('ring').style.strokeDashoffset = String(502.65 * (1 - (state.hold || 0)))
+    $('thanks').classList.toggle('show', !state.notify && state.thanks_until * 1000 > now)
+  }
+
+  function connect() {
+    const ws = new WebSocket(`ws://${location.hostname || 'localhost'}:8765`)
+    ws.onmessage = (e) => {
+      state = JSON.parse(e.data)
+      if (lastChime !== null && state.chime > lastChime) chime()
+      lastChime = state.chime
+      render()
+    }
+    ws.onclose = () => setTimeout(connect, 1000)
+  }
+  connect()
+  setInterval(render, 1000)
+</script>
+</body>
+</html>

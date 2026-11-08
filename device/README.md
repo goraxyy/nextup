@@ -1,0 +1,69 @@
+# Stall agent (Raspberry Pi)
+
+Runs on each stall's Pi. It reads the HC-SR04 distance sensor, decides when the stall is in use,
+sends events to the API (`/api/device/events`), listens for this stall's messages on Supabase
+Realtime (`device:<stall>`), and drives the stall screen at http://localhost:8080.
+
+```
+HC-SR04 ──► presence (in use after 20 s, free after 30 s; hand-hold = within 15 cm for 2 s)
+               │                                   ▲ stall state on (re)connect: GET /api/device/state
+               ▼                                   │
+        SQLite queue ──► POST /api/device/events ──┘ (survives outages and restarts)
+Supabase Realtime device:<stall> ──► stall screen: Notify pop-up, re-chime, "held for the next person"
+```
+
+## Wiring the HC-SR04
+
+| HC-SR04 | Pi (BCM) | Physical pin |
+|---|---|---|
+| VCC | 5V | 2 |
+| GND | GND | 6 |
+| TRIG | GPIO23 | 16 |
+| ECHO | GPIO24, **through a voltage divider** | 18 |
+
+ECHO outputs 5 V, and the Pi's pins only take 3.3 V. Wire ECHO → 1 kΩ → GPIO24, and GPIO24 →
+2 kΩ → GND. Without the divider you can damage the Pi.
+
+Mount the sensor beside the screen, pointing into the stall, so a person showering is closer than
+`PRESENT_MAX_CM` and the empty stall reads farther (or nothing). Keep it where a hand can reach
+it, but where the person isn't normally within `HOLD_MAX_CM`.
+
+## Settings
+
+`/etc/nextup/agent.env` (see [infra/pi/agent.env.example](../infra/pi/agent.env.example)). On the
+laptop, `scripts/pi_env.py s1` prints a filled-in copy with the stall's token.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `NEXTUP_API`, `NEXTUP_STALL`, `NEXTUP_DEVICE_TOKEN` | | API, stall id, the stall's token |
+| `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY` | | Supabase project (the publishable key is public) |
+| `TRIG_PIN`, `ECHO_PIN` | 23, 24 | HC-SR04 pins (BCM) |
+| `PRESENT_MAX_CM` | 120 | Closer than this means someone is in the stall |
+| `HOLD_MAX_CM`, `HOLD_SECONDS` | 15, 2 | Hand-hold: this close, this long |
+| `ENTER_SECONDS`, `LEAVE_SECONDS` | 20, 30 | Presence hysteresis |
+| `FAKE_SENSOR` | off | Type `in`, `out` or `hold` instead of using the sensor |
+
+## Install, calibrate, update
+
+See "Setting up a stall Pi" in the [README](../README.md). In short:
+
+```bash
+git clone https://github.com/goraxyy/nextup.git ~/nextup && cd ~/nextup
+./infra/pi/install.sh                                        # venv, systemd units, /etc/nextup/agent.env
+sudo nano /etc/nextup/agent.env                              # paste the stall's settings
+.venv-pi/bin/python -m device.nextup_agent.calibrate          # pick PRESENT_MAX_CM and HOLD_MAX_CM
+sudo systemctl restart nextup-agent && journalctl -u nextup-agent -f
+```
+
+Update later with `cd ~/nextup && git pull && ./infra/pi/install.sh && sudo systemctl restart nextup-agent`.
+
+## Try it without a Pi
+
+```bash
+set -a; . ./.env.local; set +a
+NEXTUP_API=http://localhost:8000 NEXTUP_STALL=s1 FAKE_SENSOR=1 NEXTUP_DATA_DIR=/tmp/nextup-agent \
+NEXTUP_DEVICE_TOKEN=<s1 token from devices.dev.json> .venv/bin/python -m device.nextup_agent
+# then type: in   (wait 20 s)   hold   out
+```
+
+Open http://localhost:8080 to see the stall screen.

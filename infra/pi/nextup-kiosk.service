@@ -1,0 +1,16 @@
+# Optional: only if the Pi doesn't already open Chromium in kiosk mode on its own.
+[Unit]
+Description=NextUp stall screen (Chromium kiosk)
+After=graphical.target nextup-agent.service
+Wants=nextup-agent.service
+
+[Service]
+User=__USER__
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/__USER__/.Xauthority
+ExecStart=/bin/sh -c 'exec "$(command -v chromium-browser || command -v chromium)" --kiosk --noerrdialogs --disable-infobars --incognito --autoplay-policy=no-user-gesture-required http://localhost:8080'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

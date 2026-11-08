@@ -1,0 +1,15 @@
+[Unit]
+Description=NextUp stall agent (HC-SR04, API, stall screen)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+WorkingDirectory=__REPO__
+EnvironmentFile=/etc/nextup/agent.env
+ExecStart=__REPO__/.venv-pi/bin/python -m device.nextup_agent
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

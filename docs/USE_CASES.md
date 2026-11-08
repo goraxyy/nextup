@@ -1,6 +1,6 @@
 # NextUp screen use cases
 
-The screen has no touch. The only input inside the stall is a hand held up in front of the radar
+The screen has no touch. The only input inside the stall is a hand held up in front of the distance sensor
 for about 2 seconds. Output is the screen plus the room speaker.
 
 ## 1. Campus events

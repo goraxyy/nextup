@@ -22,7 +22,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from backend.auth import hash_secret  # noqa: E402
 
 ROOM = "r1"
-OUT = pathlib.Path(__file__).resolve().parents[1] / "devices.local.json"
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
 def main() -> None:
@@ -30,11 +30,13 @@ def main() -> None:
     parser.add_argument("--database-url", default=os.environ.get("TIGER_DATABASE_URL") or os.environ.get("DATABASE_URL"))
     parser.add_argument("--code", help="floor code (default: keep the one in devices.local.json, or make a 4-digit one)")
     parser.add_argument("--api", default="http://localhost:8000", help="API base URL to store for the scripts")
+    parser.add_argument("--out", default="devices.local.json", help="where to write the tokens (git-ignored devices.*.json)")
     args = parser.parse_args()
+    out = ROOT / args.out
     if not args.database_url:
         sys.exit("Set TIGER_DATABASE_URL or pass --database-url")
 
-    previous = json.loads(OUT.read_text()) if OUT.exists() else {}
+    previous = json.loads(out.read_text()) if out.exists() else {}
     code = args.code or previous.get("floor_code") or f"{secrets.randbelow(10_000):04d}"
 
     devices = {}
@@ -52,9 +54,9 @@ def main() -> None:
             )
             devices[stall_id] = {"stall_id": stall_id, "name": name, "simulated": simulated, "token": token}
 
-    OUT.write_text(json.dumps({"api": args.api, "room": ROOM, "floor_code": code, "devices": devices}, indent=2))
-    OUT.chmod(0o600)
-    print(f"room {ROOM}: floor code {code}; tokens for {', '.join(devices)} written to {OUT.name}")
+    out.write_text(json.dumps({"api": args.api, "room": ROOM, "floor_code": code, "devices": devices}, indent=2))
+    out.chmod(0o600)
+    print(f"room {ROOM}: floor code {code}; tokens for {', '.join(devices)} written to {out.name}")
 
 
 if __name__ == "__main__":

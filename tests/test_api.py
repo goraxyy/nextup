@@ -134,3 +134,27 @@ def test_failed_broadcast_is_resent_by_the_next_tick(api, monkeypatch):
     monkeypatch.setattr(realtime, "broadcast", lambda messages: api["sent"].extend(messages))
     api["client"].post("/api/tick", headers={"X-Cron-Secret": "test-cron"})
     assert sent(api, "stall.changed")
+
+
+def test_device_state_shows_the_open_pop_up_and_reservation(api):
+    client = api["client"]
+    post_event(api, "s1", "session.start")
+    client.post("/api/rooms/r1/notify", headers={"X-Floor-Code": "1234"})
+    state = client.get("/api/device/state", headers={"Authorization": f"Bearer {TOKENS['s1']}"}).json()
+    assert state["stall"]["state"] == "in_use"
+    assert state["notify"]["status"] == "sent" and state["reserved"] is None
+
+
+def test_device_link_stamps_the_stall_on_the_supabase_user(api, monkeypatch):
+    from backend import app as app_module
+
+    stamped = {}
+    monkeypatch.setattr(app_module, "verify_supabase_token", lambda token: {"sub": "user-1", "app_metadata": {}})
+    monkeypatch.setattr(app_module.supabase_admin, "set_device_claim", lambda uid, stall: stamped.update({uid: stall}))
+    body = api["client"].post("/api/device/link", json={"access_token": "jwt"},
+                              headers={"Authorization": f"Bearer {TOKENS['s1']}"}).json()
+    assert body["topic"] == "device:s1" and stamped == {"user-1": "s1"}
+
+
+def test_device_link_needs_a_device_token(api):
+    assert api["client"].post("/api/device/link", json={"access_token": "jwt"}).status_code == 401

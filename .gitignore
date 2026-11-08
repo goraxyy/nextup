@@ -4,6 +4,8 @@
 .env.supabase-db
 supabase/.temp/
 devices.local.json
+devices.*.json
+.venv-pi/
 .venv/
 __pycache__/
 .pytest_cache/

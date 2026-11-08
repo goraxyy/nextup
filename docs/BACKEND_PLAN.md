@@ -13,7 +13,7 @@ Tiger's `pg_notify`.
 | Supabase (project `nextup`, US East) | Realtime topics with access policies; Cron calls `/api/tick` every 10 s |
 | Tests | 26 pass against local TimescaleDB; `web/scripts/smoke.mjs` passes against production |
 | Old server (pg_notify listener) | Still connected when last checked. It keeps working: nothing it uses was changed |
-| Device agent and kiosk (the Pi side) | Not built (Phase 2) |
+| Stall agent and screen (the Pi side) | Built in `device/`, tested end to end with a fake sensor; not yet on the real Pi |
 
 ## Services
 
@@ -66,7 +66,7 @@ A phone joins the line, and Stall 1 frees up:
 
 | Rule | Lives in |
 |---|---|
-| FREE / IN USE / FINISHING detection, hand-hold, "Still in there?" | Device agent (needs raw radar frames) |
+| FREE / IN USE / FINISHING detection, hand-hold, "Still in there?" | Device agent (needs raw sensor readings) |
 | Stall history, `since`, `updated_at` | Team's triggers `stalls_touch`, `stalls_log_event` (001) |
 | Next in line when a stall frees up | Team's `call_next_on_free()` (001), real stalls only (003) |
 | A free real stall nobody holds goes to the next person | `reassign_free_stalls()` (005) |

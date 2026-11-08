@@ -16,7 +16,8 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from . import db
-from .auth import browser_id, check_join_code, device_stall, require_cron
+from . import supabase_admin
+from .auth import browser_id, check_join_code, device_stall, require_cron, verify_supabase_token
 from .config import settings
 from .realtime import flush_outbox, flush_quietly
 
@@ -199,6 +200,48 @@ def device_events(batch: DeviceBatch, stall: str = Depends(device_stall)) -> dic
                 errors.append({"event_id": str(event.event_id), "error": type(exc).__name__})
     flush_quietly()
     return {"stall": stall, "applied": applied, "replayed": replayed, "errors": errors}
+
+
+class LinkBody(BaseModel):
+    access_token: str
+
+
+@app.post("/api/device/link")
+def device_link(body: LinkBody, stall: str = Depends(device_stall)) -> dict:
+    """Let the Pi's Supabase user read device:<stall>.
+
+    The Pi signs in to Supabase anonymously, then calls this with its device token and its
+    Supabase access token. After a token refresh, its tokens carry app_metadata.device_id,
+    which the Realtime policy for device topics checks.
+    """
+    claims = verify_supabase_token(body.access_token)
+    if (claims.get("app_metadata") or {}).get("device_id") != stall:
+        try:
+            supabase_admin.set_device_claim(claims["sub"], stall)
+        except supabase_admin.AdminNotConfigured as exc:
+            raise HTTPException(503, str(exc)) from exc
+    return {"stall": stall, "user_id": claims["sub"], "topic": f"device:{stall}"}
+
+
+@app.get("/api/device/state")
+def device_state(stall: str = Depends(device_stall)) -> dict:
+    """Everything the stall's screen should show now, for (re)connects."""
+    with db.pool().connection() as conn:
+        row = conn.execute(
+            "select id, name, state, since, room_id from stalls where id = %s", [stall]
+        ).fetchone()
+        notify = conn.execute(
+            "select id as notify_id, status, created_at, rechimed_at from notifies"
+            " where stall_id = %s and status in ('sent', 'delivered') order by created_at desc limit 1",
+            [stall],
+        ).fetchone()
+        reserved = conn.execute(
+            "select id as queue_id, called_at + interval '2 minutes' as until from queue"
+            " where called_stall_id = %s and status = 'called' order by called_at desc limit 1",
+            [stall],
+        ).fetchone()
+        now = conn.execute("select now() as now").fetchone()["now"]
+    return {"stall": row, "notify": notify, "reserved": reserved, "server_time": now}
 
 
 # Timers ------------------------------------------------------------------------------
