@@ -21,7 +21,7 @@ import httpx
 from . import __version__
 from .config import Config
 from .kiosk import Kiosk
-from .ld2410 import LD2410Sensor
+from .ld2410 import LD2410Sensor, RadarSetup
 from .presence import Presence
 from .sensor import FakeSensor, Reading, UltrasonicSensor
 from .realtime import DeviceChannel, SupabaseSession
@@ -53,6 +53,13 @@ def uptime_s() -> int | None:
         return None
 
 
+def radar_setup(cfg: Config) -> RadarSetup | None:
+    if not cfg.radar_setup:
+        return None
+    return RadarSetup(gate_cm=cfg.radar_gate_cm, max_cm=cfg.radar_max_cm, moving_sens=cfg.radar_moving_sens,
+                      still_sens=cfg.radar_still_sens, nobody_s=cfg.radar_nobody_s)
+
+
 class Agent:
     def __init__(self, cfg: Config) -> None:
         if cfg.fake_sensor:  # the fake sensor plays the HC-SR04 for presence and hand-hold
@@ -73,7 +80,7 @@ class Agent:
         if cfg.presence_sensor == "ld2410c":
             self.sensor = LD2410Sensor(cfg.radar_port, cfg.radar_baud, cfg.radar_max_cm, cfg.radar_min_energy,
                                        cfg.radar_min_cm, cfg.radar_debug, cfg.radar_hold, cfg.radar_hold_max_cm,
-                                       cfg.radar_hold_min_energy)
+                                       cfg.radar_hold_min_energy, setup=radar_setup(cfg), data_dir=cfg.data_dir)
             self.sensors = [self.sensor] + ([ultrasonic] if ultrasonic else [])
         else:
             self.sensor = ultrasonic
@@ -239,10 +246,11 @@ class Agent:
         for sensor in self.sensors:
             sensor.start(loop, self.on_reading)
         cfg = self.cfg
-        hc_sr04 = f"HC-SR04 TRIG {cfg.trigger_pin} ECHO {cfg.echo_pin}" if cfg.ultrasonic else "off (ULTRASONIC=off)"
+        hc_sr04 = f"HC-SR04 TRIG {cfg.trigger_pin} ECHO {cfg.echo_pin}" if cfg.ultrasonic else None
+        holds = [h for h in (hc_sr04, "radar" if cfg.radar_hold else None) if h] or ["off"]
         sensors = ("fake sensor" if cfg.fake_sensor
-                   else f"presence: LD2410C on {cfg.radar_port}, hand-hold: {hc_sr04}" if cfg.presence_sensor == "ld2410c"
-                   else hc_sr04)
+                   else f"presence: LD2410C on {cfg.radar_port}, hand-hold: {' + '.join(holds)}"
+                   if cfg.presence_sensor == "ld2410c" else hc_sr04)
         log.info("NextUp agent %s for stall %s → %s (%s)", __version__, cfg.stall, cfg.api, sensors)
         async with httpx.AsyncClient() as client:
             await asyncio.gather(

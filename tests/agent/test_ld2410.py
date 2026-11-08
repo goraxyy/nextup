@@ -1,5 +1,7 @@
 """LD2410C radar: frame parsing, the occupancy filter, and presence with the radar. No hardware needed."""
 
+import json
+
 import pytest
 
 from device.nextup_agent.config import load
@@ -189,3 +191,143 @@ def test_a_hand_raised_to_the_radar_acknowledges_the_pop_up():
     p.hold_armed = True
     hand = Reading(12, present=True, hold_near=True)
     assert kinds(p, hand, 0, 5.2, step=0.1).count("input.hold") == 1
+
+
+# Radar setup and calibration (needs the radar's RX) ----------------------------------
+
+
+from device.nextup_agent.ld2410 import (CAL_FILE, CAL_TRIGGER, Calibration, RadarError, RadarSetup,  # noqa: E402
+                                        command, configure)
+
+
+def engineering_frame(moving_gates, still_gates, state=3) -> bytes:
+    n = len(moving_gates) - 1
+    data = bytes([0x01, 0xAA, state, 80, 0, 60, 90, 0, 50, 90, 0, n, n, *moving_gates, *still_gates, 0, 0, 0x55, 0x00])
+    return bytes.fromhex("f4f3f2f1") + len(data).to_bytes(2, "little") + data + bytes.fromhex("f8f7f6f5")
+
+
+class FakeRadar:
+    """Plays the LD2410C's side of the serial port: answers setup commands, streams reports."""
+
+    def __init__(self, wired=True):
+        self.wired, self.out = wired, bytearray()
+        self.gate_cm, self.max_gates, self.nobody = 75, (8, 8), 5
+        self.moving = [50, 50, 40, 30, 20, 15, 15, 15, 15]
+        self.still = [0, 0, 40, 40, 30, 30, 20, 20, 20]
+        self.writes, self.restarts, self.engineering = [], 0, False
+
+    def ack(self, word, data=b"", status=0):
+        body = (word | 0x0100).to_bytes(2, "little") + status.to_bytes(2, "little") + data
+        self.out += engineering_frame([1] * 9, [2] * 9)  # reports keep coming in between
+        self.out += bytes.fromhex("fdfcfbfa") + len(body).to_bytes(2, "little") + body + bytes.fromhex("04030201")
+
+    def write(self, frame):
+        if not self.wired:
+            return
+        word, value = frame[6] | frame[7] << 8, frame[8:-4]
+        num = lambda i: int.from_bytes(value[i + 2 : i + 6], "little")  # noqa: E731
+        self.writes.append(word)
+        if word == 0x0061:
+            self.ack(word, bytes([0xAA, 8, *self.max_gates, *self.moving, *self.still]) + self.nobody.to_bytes(2, "little"))
+        elif word == 0x00AB:
+            self.ack(word, (1 if self.gate_cm == 20 else 0).to_bytes(2, "little"))
+        elif word == 0x00AA:
+            self.pending_gate = 20 if value[0] == 1 else 75
+            self.ack(word)
+        elif word == 0x00A3:
+            self.gate_cm, self.restarts = self.pending_gate, self.restarts + 1
+            self.ack(word)
+        elif word == 0x0060:
+            self.max_gates, self.nobody = (num(0), num(6)), num(12)
+            self.ack(word)
+        elif word == 0x0064:
+            gate = num(0)
+            self.moving[gate], self.still[gate] = num(6), num(12)
+            self.ack(word)
+        else:
+            self.engineering = {0x0062: True, 0x0063: False}.get(word, self.engineering)
+            self.ack(word)
+
+    def read(self, n):
+        data, self.out[:] = bytes(self.out[:n]), self.out[n:]
+        return data
+
+    def reset_input_buffer(self):
+        self.out.clear()
+
+
+def test_command_frames_match_the_datasheet():
+    assert command(0x00FF, b"\x01\x00").hex() == "fdfcfbfa0400ff00010004030201"   # enable configuration
+    assert command(0x00FE).hex() == "fdfcfbfa0200fe0004030201"                     # end configuration
+
+
+def test_engineering_frames_carry_the_energy_at_each_gate():
+    frame = FrameParser().feed(engineering_frame([5, 60, 30, 0, 0, 0, 0, 0, 1], [9, 40, 20, 3, 0, 0, 0, 0, 2]))[0]
+    assert frame.moving_gates == (5, 60, 30, 0, 0, 0, 0, 0, 1) and frame.still_gates[1] == 40
+    assert (frame.moving_cm, frame.still_energy) == (80, 50)
+    assert FrameParser().feed(frame_bytes())[0].moving_gates == ()   # basic frames have none
+
+
+def test_setup_narrows_the_radar_and_only_writes_what_changed():
+    radar = FakeRadar()
+    sens = (60, 50, 40, 40, 40, 40, 40, 40, 40)
+    gate_cm, params = configure(radar, RadarSetup(gate_cm=20, max_cm=120, moving_sens=sens), sleep=lambda s: None)
+    assert gate_cm == 20 and radar.restarts == 1                       # 20 cm gates need a radar restart
+    assert (params.max_moving_gate, params.max_still_gate) == (5, 5)   # 6 gates x 20 cm = 0-120 cm
+    assert params.moving_sens == sens and params.still_sens[2] == 40   # still sensitivity left alone
+    assert radar.engineering and radar.writes[-1] == 0x00FE            # left setup mode
+    radar.writes.clear()
+    configure(radar, RadarSetup(gate_cm=20, max_cm=120, moving_sens=sens), sleep=lambda s: None)
+    assert 0x0060 not in radar.writes and 0x0064 not in radar.writes and 0x00AA not in radar.writes
+
+
+def test_max_gate_follows_radar_max_cm():
+    assert RadarSetup(gate_cm=75, max_cm=150).max_gate() == 2          # the radar's minimum
+    assert RadarSetup(gate_cm=75, max_cm=300).max_gate() == 3
+    assert RadarSetup(gate_cm=20, max_cm=150).max_gate() == 7
+    assert RadarSetup(gate_cm=20, max_cm=400).max_gate() == 8
+
+
+def test_setup_without_the_rx_wire_fails_cleanly():
+    with pytest.raises(RadarError, match="RX"):
+        configure(FakeRadar(wired=False), RadarSetup())
+
+
+def test_calibration_puts_each_threshold_above_the_empty_stall():
+    cal = Calibration(seconds=1, margin=10, now=0)
+    for frame in FrameParser().feed(engineering_frame([3, 70, 5, 0, 0, 0, 0, 0, 0], [20, 30, 8, 0, 0, 0, 0, 0, 95])
+                                    + engineering_frame([9, 40, 2, 0, 0, 0, 0, 0, 0], [5, 35, 1, 0, 0, 0, 0, 0, 0])):
+        cal.add(frame)
+    moving, still = cal.thresholds()
+    assert moving == (19, 80, 15, 10, 10, 10, 10, 10, 10)               # peak + 10, never below 10
+    assert still == (30, 45, 18, 10, 10, 10, 10, 10, 100)               # capped at 100
+
+
+def test_calibration_runs_inside_the_agent_and_is_reused(tmp_path):
+    radar = FakeRadar()
+    sensor = LD2410Sensor(setup=RadarSetup(gate_cm=75, max_cm=150), data_dir=tmp_path)
+    (tmp_path / CAL_TRIGGER).write_text('{"seconds": 2, "margin": 5}')
+    sensor.check_calibration_request(now=100.0)
+    assert sensor.calibration and not (tmp_path / CAL_TRIGGER).exists()
+    for frame in FrameParser().feed(engineering_frame([0, 50, 20, 0, 0, 0, 0, 0, 0], [0, 30, 10, 0, 0, 0, 0, 0, 0])):
+        sensor.calibration.add(frame)
+    sensor.finish_calibration(radar)
+    saved = json.loads((tmp_path / CAL_FILE).read_text())
+    assert saved["moving_sens"][:3] == [10, 55, 25] and radar.moving[:3] == [10, 55, 25]
+    # After a restart the saved calibration is written again, unless RADAR_*_SENS are set.
+    fresh = FakeRadar()
+    LD2410Sensor(setup=RadarSetup(), data_dir=tmp_path).apply_setup(fresh)
+    assert fresh.moving[:3] == [10, 55, 25] and fresh.still[:3] == [10, 35, 15]
+    explicit = FakeRadar()
+    LD2410Sensor(setup=RadarSetup(moving_sens=(70,) * 9), data_dir=tmp_path).apply_setup(explicit)
+    assert explicit.moving == [70] * 9
+
+
+def test_radar_setup_settings():
+    cfg = load({**RADAR_ENV, "RADAR_GATE_CM": "20", "RADAR_MOVING_SENS": "40", "RADAR_STILL_SENS": "0,0,40,40,30,30,20,20,20"})
+    assert cfg.radar_gate_cm == 20 and cfg.radar_moving_sens == (40,) * 9 and cfg.radar_still_sens[2] == 40
+    assert load(RADAR_ENV).radar_setup and load({**RADAR_ENV, "RADAR_SETUP": "off"}).radar_setup is False
+    with pytest.raises(SystemExit, match="RADAR_GATE_CM"):
+        load({**RADAR_ENV, "RADAR_GATE_CM": "50"})
+    with pytest.raises(SystemExit, match="RADAR_MOVING_SENS"):
+        load({**RADAR_ENV, "RADAR_MOVING_SENS": "1,2,3"})

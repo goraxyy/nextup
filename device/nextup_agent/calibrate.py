@@ -17,9 +17,22 @@ Stop the agent first if it uses the radar (PRESENCE_SENSOR=ld2410c). Each line s
 radar sees and the occupancy filter's score, like the Arduino sketch's Serial Plotter. Watch the
 empty stall (targets should be beyond RADAR_MAX_CM or weaker than RADAR_MIN_ENERGY) and someone
 standing still where they shower (they should stay "occupied").
+
+LD2410C automatic calibration (per-gate sensitivity from the empty stall):
+
+    .venv-pi/bin/python -m device.nextup_agent.calibrate --radar-auto [--seconds 20] [--margin 10]
+
+Run it with the agent running and the stall empty (step out, close the curtain). The agent
+records the strongest signal at each distance gate for --seconds, sets each gate's threshold
+--margin above it, writes the result to the radar and saves it in radar-calibration.json in
+its data dir, so it is used again after a restart. Needs the radar's RX wired to GPIO14.
+Recalibrate whenever the radar or what's around it moves.
 """
 
 import argparse
+import json
+import os
+import pathlib
 import statistics
 import time
 import warnings
@@ -76,6 +89,36 @@ def radar(args) -> None:
                   f"still: {frame.still_cm:4d} cm E{frame.still_energy:3d}  state:{frame.state}", flush=True)
 
 
+def radar_auto(args) -> None:
+    from .ld2410 import CAL_FILE, CAL_TRIGGER
+
+    data_dir = pathlib.Path(args.data_dir)
+    result_path, trigger = data_dir / CAL_FILE, data_dir / CAL_TRIGGER
+    before = result_path.stat().st_mtime if result_path.exists() else 0
+    trigger.write_text(json.dumps({"seconds": args.seconds, "margin": args.margin}))
+    print(f"Calibrating: keep the stall empty and still for {args.seconds:.0f} s...")
+    deadline = time.monotonic() + args.seconds + 15
+    while time.monotonic() < deadline:
+        time.sleep(0.5)
+        if result_path.exists() and result_path.stat().st_mtime > before:
+            break
+        if trigger.exists() and time.monotonic() > deadline - args.seconds - 10:
+            trigger.unlink(missing_ok=True)
+            raise SystemExit("The agent didn't pick up the request: is it running with PRESENCE_SENSOR=ld2410c?")
+    else:
+        raise SystemExit("No result from the agent; check: journalctl -u nextup-agent -n 30")
+    result = json.loads(result_path.read_text())
+    if "error" in result:
+        raise SystemExit(f"Calibration failed: {result['error']}")
+    size = result.get("gate_cm") or 75
+    print(f"Done ({result['frames']} reports, {size} cm gates). Threshold = empty-stall peak + {result['margin']}:")
+    print(" gate  distance      moving: empty -> threshold   still: empty -> threshold")
+    for g, (em, m, es, st) in enumerate(zip(result["empty_moving_max"], result["moving_sens"],
+                                            result["empty_still_max"], result["still_sens"])):
+        print(f"  {g}    {g * size:3d}-{(g + 1) * size:3d} cm         {em:3d} -> {m:3d}                {es:3d} -> {st:3d}")
+    print(f"Saved to {result_path} and written to the radar.")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--radar", action="store_true", help="watch the LD2410C instead of the HC-SR04")
@@ -87,9 +130,14 @@ def main() -> None:
     parser.add_argument("--max-cm", type=int, default=150)
     parser.add_argument("--min-energy", type=int, default=30)
     parser.add_argument("--min-cm", type=int, default=0, help="ignore radar targets closer than this")
+    parser.add_argument("--radar-auto", action="store_true", help="calibrate the radar's per-gate sensitivity"
+                        " from the empty stall, through the running agent")
+    parser.add_argument("--seconds", type=float, default=20, help="--radar-auto: how long to record the empty stall")
+    parser.add_argument("--margin", type=int, default=10, help="--radar-auto: threshold above the empty-stall peak")
+    parser.add_argument("--data-dir", default=os.environ.get("NEXTUP_DATA_DIR", "/var/lib/nextup"))
     args = parser.parse_args()
     try:
-        radar(args) if args.radar else ultrasonic(args)
+        radar_auto(args) if args.radar_auto else radar(args) if args.radar else ultrasonic(args)
     except KeyboardInterrupt:
         print()
 

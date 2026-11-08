@@ -37,10 +37,18 @@ class Config:
     presence_sensor: str = "ultrasonic"
     radar_port: str = "/dev/serial0"
     radar_baud: int = 256000
-    radar_max_cm: int = 150       # radar targets farther than this are outside the stall
+    radar_max_cm: int = 150       # radar targets farther than this are outside the stall (also the radar's last gate)
     radar_min_energy: int = 30    # weaker radar echoes (0-100) are ignored
     radar_min_cm: int = 0         # radar targets closer than this (e.g. a flexing plastic cover) are ignored
     radar_debug: bool = False     # log what the radar sees once a second, for tuning
+    # Written to the radar at start (needs its RX wired): gate size (75 or 20 cm), a sensitivity
+    # per gate (9 values, 0-100, higher = less sensitive; None = the last calibration, else the
+    # radar's own), and how long it keeps reporting someone who has gone. RADAR_SETUP=off: never write.
+    radar_setup: bool = True
+    radar_gate_cm: int = 75
+    radar_moving_sens: tuple[int, ...] | None = None
+    radar_still_sens: tuple[int, ...] | None = None
+    radar_nobody_s: int | None = None
     # Hand-hold on the radar: a moving target this close and this strong (while the pop-up shows).
     radar_hold: bool = True
     radar_hold_max_cm: int = 30
@@ -60,6 +68,22 @@ def _num(env: dict, name: str, default, cast=float):
     return cast(value) if value not in (None, "") else default
 
 
+def _gates(env: dict, name: str) -> tuple[int, ...] | None:
+    """RADAR_MOVING_SENS=40 (every gate) or 50,50,40,30,20,15,15,15,15 (gates 0-8)."""
+    value = env.get(name, "").strip()
+    if not value:
+        return None
+    try:
+        numbers = [int(v) for v in value.split(",")]
+    except ValueError:
+        raise SystemExit(f"{name} must be a number or 9 comma-separated numbers (got {value!r})") from None
+    if len(numbers) == 1:
+        numbers *= 9
+    if len(numbers) != 9 or not all(0 <= n <= 100 for n in numbers):
+        raise SystemExit(f"{name} needs 1 or 9 values from 0 to 100, one per gate (got {value!r})")
+    return tuple(numbers)
+
+
 def load(env: dict | None = None) -> Config:
     env = dict(os.environ if env is None else env)
     missing = [name for name in REQUIRED if not env.get(name)]
@@ -71,6 +95,9 @@ def load(env: dict | None = None) -> Config:
     ultrasonic = env.get("ULTRASONIC", "").strip().lower() not in ("0", "off", "false", "no")
     if not ultrasonic and presence_sensor != "ld2410c":
         raise SystemExit("ULTRASONIC=off needs PRESENCE_SENSOR=ld2410c: without the radar, the HC-SR04 is the only sensor")
+    gate_cm = _num(env, "RADAR_GATE_CM", 75, int)
+    if gate_cm not in (75, 20):
+        raise SystemExit(f"RADAR_GATE_CM must be 75 or 20 (got {gate_cm})")
     return Config(
         api=env["NEXTUP_API"].rstrip("/"),
         stall=env["NEXTUP_STALL"],
@@ -100,6 +127,11 @@ def load(env: dict | None = None) -> Config:
         radar_min_energy=_num(env, "RADAR_MIN_ENERGY", 30, int),
         radar_min_cm=_num(env, "RADAR_MIN_CM", 0, int),
         radar_debug=env.get("RADAR_DEBUG", "").lower() in ("1", "true", "yes"),
+        radar_setup=env.get("RADAR_SETUP", "1").strip().lower() not in ("0", "off", "false", "no"),
+        radar_gate_cm=gate_cm,
+        radar_moving_sens=_gates(env, "RADAR_MOVING_SENS"),
+        radar_still_sens=_gates(env, "RADAR_STILL_SENS"),
+        radar_nobody_s=_num(env, "RADAR_NOBODY_SECONDS", None, int),
         radar_hold=env.get("RADAR_HOLD", "1").strip().lower() not in ("0", "off", "false", "no"),
         radar_hold_max_cm=_num(env, "RADAR_HOLD_MAX_CM", 30, int),
         radar_hold_min_energy=_num(env, "RADAR_HOLD_MIN_ENERGY", 50, int),
