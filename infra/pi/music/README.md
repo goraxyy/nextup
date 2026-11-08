@@ -26,6 +26,12 @@ It's off unless `MUSIC=spotify` is set, and everything below can be undone (see 
 4. In `/etc/nextup/agent.env`: `MUSIC=spotify-web` and `SPOTIFY_CLIENT_ID=<client id>`, then
    restart the agent.
 
+If the phone plays but the screen doesn't change, Spotify may not count the phone as the
+account's active player: its API then answers "nothing playing" (HTTP 204), a long-standing
+Spotify quirk with iPhones. In the Spotify app, pick the phone again in the devices list ("This
+iPhone"), or move playback to it once through the API (`PUT /v1/me/player` with its device id):
+after that it's reported normally.
+
 The screen follows whatever that account plays, wherever it plays it. To sign the Pi out,
 delete `/var/lib/nextup/spotify-token.json`, or remove the app at spotify.com/account/apps.
 
