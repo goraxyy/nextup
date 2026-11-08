@@ -6,7 +6,30 @@ stall screen, and pauses or skips with a hand raised to the radar.
 **This is an experiment on its own branch (`experiment/spotify-music`), not on `master`.**
 It's off unless `MUSIC=spotify` is set, and everything below can be undone (see "Going back").
 
-## How it works
+## Two modes
+
+- **`MUSIC=spotify-web` (use this one).** The official Spotify app plays on the phone, and the
+  phone sends it to the speaker over Bluetooth. The Pi follows that one signed-in account
+  through Spotify's Web API: it shows the song with synced lyrics, and radar gestures pause and
+  skip it. It needs a Spotify developer app (see "Spotify Web API sign-in" below).
+- **`MUSIC=spotify`.** go-librespot on the Pi is a Spotify Connect speaker. In November 2026
+  Spotify refused audio to it for every track ("audio key code 1", go-librespot issue #279),
+  even on Premium, so it's kept only for when that's fixed.
+
+## Spotify Web API sign-in (`MUSIC=spotify-web`)
+
+1. At https://developer.spotify.com/dashboard, create an app: any name, Web API, redirect URI
+   `http://127.0.0.1:8888/callback`. Copy its **Client ID**. In development mode only the
+   app owner and the users added under "User Management" can sign in.
+2. On a laptop: `python scripts/spotify_login.py <client id>`, then approve in the browser.
+3. Copy the token to the Pi: `scp spotify-token.json pi@<pi>:/var/lib/nextup/spotify-token.json`
+4. In `/etc/nextup/agent.env`: `MUSIC=spotify-web` and `SPOTIFY_CLIENT_ID=<client id>`, then
+   restart the agent.
+
+The screen follows whatever that account plays, wherever it plays it. To sign the Pi out,
+delete `/var/lib/nextup/spotify-token.json`, or remove the app at spotify.com/account/apps.
+
+## How it works (go-librespot mode)
 
 1. In the Spotify app, tap the devices icon and pick **NextUp Stall 1**. Spotify Connect
    needs Spotify Premium, and the phone must be on the same Wi-Fi as the Pi.
@@ -56,7 +79,8 @@ spotify.com/pair. That account then sees the Pi from anywhere.
 # 1. The agent: back to exactly the old behavior
 grep -v '^MUSIC=' /etc/nextup/agent.env > /tmp/agent.env && cat /tmp/agent.env > /etc/nextup/agent.env
 #    (writes the file in place: /etc/nextup itself isn't writable without sudo), then restart the agent
-# 2. The music player: gone
+# 2. The music player: gone (and the Spotify Web API sign-in)
+rm -f /var/lib/nextup/spotify-token.json
 systemctl --user disable --now nextup-spotify
 rm ~/.config/systemd/user/nextup-spotify.service && systemctl --user daemon-reload
 rm -rf ~/nextup-music

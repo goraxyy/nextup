@@ -24,7 +24,7 @@ from .kiosk import Kiosk
 from .ld2410 import LD2410Sensor, RadarSetup
 from .presence import Presence
 from .sensor import FakeSensor, Reading, UltrasonicSensor
-from .stall_music import StallMusic
+from .stall_music import LibrespotPlayer, SpotifyWebPlayer, StallMusic
 from .realtime import DeviceChannel, SupabaseSession
 from .uplink import Uplink, now_iso
 
@@ -91,9 +91,12 @@ class Agent:
         self.last_reading: Reading | None = None
         self.music_changed = asyncio.Event()
         # Experimental: the shower's own music (MUSIC=spotify). None leaves everything as before.
-        self.stall_music = StallMusic(cfg.music_api, self.kiosk) if cfg.music == "spotify" else None
-        if self.stall_music:
-            self.kiosk.publish(music_hint=cfg.music_device_name or "")
+        player = (SpotifyWebPlayer(cfg.spotify_client_id, cfg.spotify_token_file) if cfg.music == "spotify-web"
+                  else LibrespotPlayer(cfg.music_api) if cfg.music == "spotify" else None)
+        self.stall_music = StallMusic(player, self.kiosk) if player else None
+        if self.stall_music:  # the hint on the screen: how to get your music on it
+            self.kiosk.publish(music_hint="Spotify (lyrics show here)" if cfg.music == "spotify-web"
+                               else f"Spotify → {cfg.music_device_name}" if cfg.music_device_name else "")
 
     def set_notify(self, notify: dict | None, **changes) -> None:
         """Show or clear the Hurry pop-up; hand-holds only count while it's showing."""
@@ -260,7 +263,7 @@ class Agent:
                    if cfg.presence_sensor == "ld2410c" else hc_sr04)
         log.info("NextUp agent %s for stall %s → %s (%s)", __version__, cfg.stall, cfg.api, sensors)
         if self.stall_music:
-            log.info("shower music (experimental): Spotify Connect via %s, radar gestures %s", cfg.music_api,
+            log.info("shower music (experimental): %s, radar gestures %s", self.stall_music.player.describe(),
                      "on" if cfg.presence_sensor == "ld2410c" and cfg.radar_hold else "off (needs the radar with RADAR_HOLD)")
         async with httpx.AsyncClient() as client:
             await asyncio.gather(

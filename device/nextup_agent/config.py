@@ -64,6 +64,8 @@ class Config:
     music: str = ""
     music_api: str = "http://127.0.0.1:3678"
     music_device_name: str = ""  # the Spotify Connect name, for the screen's hint
+    spotify_client_id: str = ""   # MUSIC=spotify-web: the Spotify developer app's Client ID
+    spotify_token_file: pathlib.Path | None = None  # its refresh token, from scripts/spotify_login.py
     page_status_s: float = 10.0    # cycling pages on the stall screen
     page_event_s: float = 8.0
 
@@ -103,8 +105,10 @@ def load(env: dict | None = None) -> Config:
     gate_cm = _num(env, "RADAR_GATE_CM", 75, int)
     music = env.get("MUSIC", "").strip().lower()
     music = "" if music in ("", "0", "off", "false", "no") else music
-    if music not in ("", "spotify"):
-        raise SystemExit(f"MUSIC must be spotify or off (got {music!r})")
+    if music not in ("", "spotify", "spotify-web"):
+        raise SystemExit(f"MUSIC must be spotify-web, spotify or off (got {music!r})")
+    if music == "spotify-web" and not env.get("SPOTIFY_CLIENT_ID", "").strip():
+        raise SystemExit("MUSIC=spotify-web needs SPOTIFY_CLIENT_ID (the Spotify developer app's Client ID)")
     if gate_cm not in (75, 20):
         raise SystemExit(f"RADAR_GATE_CM must be 75 or 20 (got {gate_cm})")
     return Config(
@@ -151,4 +155,7 @@ def load(env: dict | None = None) -> Config:
         music=music,
         music_api=env.get("MUSIC_API", "http://127.0.0.1:3678"),
         music_device_name=env.get("MUSIC_DEVICE_NAME", ""),
+        spotify_client_id=env.get("SPOTIFY_CLIENT_ID", "").strip(),
+        spotify_token_file=pathlib.Path(env.get("SPOTIFY_TOKEN_FILE")
+                                        or pathlib.Path(env.get("NEXTUP_DATA_DIR", "/var/lib/nextup")) / "spotify-token.json"),
     )

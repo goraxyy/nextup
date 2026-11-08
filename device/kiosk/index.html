@@ -723,8 +723,10 @@
     const chips = []
     if (playing) chips.push(chip('note', '', playing.artist ? `${playing.title} · ${playing.artist}` : playing.title))
     if (free && best) chips.push(chip('sparkle', 'Quieter at ', best.label))
-    const device = state.music_hint === null || state.music_hint === undefined ? null : (state.music_hint || `NextUp ${state.stall_name || ''}`.trim())
-    if (device && !playing) chips.push(chip('note', 'Play your music: ', `Spotify → ${device}`))
+    // music_hint: null when music is off; "" means "Spotify → NextUp <stall name>".
+    const device = state.music_hint === null || state.music_hint === undefined ? null
+      : (state.music_hint || `Spotify → NextUp ${state.stall_name || ''}`.trim())
+    if (device && !playing) chips.push(chip('note', 'Play your music: ', device))
     once('status-chips', JSON.stringify([free, playing?.title, best?.label, device]), () => $('status-chips').replaceChildren(...chips))
   }
 

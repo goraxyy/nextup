@@ -1,11 +1,16 @@
-"""Experimental: the shower's own music, played by this Pi, with lyrics and radar gestures.
+"""Experimental: the shower's own music on the stall screen, with lyrics and radar gestures.
 
-Off unless MUSIC=spotify. Then the person showering picks songs in the Spotify app on their
-phone (Connect device "NextUp Stall 1", served by go-librespot on this Pi: see
-infra/pi/music/README.md), and the agent:
+Off unless MUSIC is set (see infra/pi/music/README.md). Two ways to follow the music:
 
-- polls go-librespot's local API for what's playing and shows it on the screen's lyrics page,
-  with synced lyrics fetched from LRCLIB (the same free source the backend uses);
+- MUSIC=spotify-web: the official Spotify app plays (on the phone, to the speaker over
+  Bluetooth) and the Pi follows the signed-in account through Spotify's Web API. This is the
+  one that works: in November 2026 Spotify refuses audio to unofficial players.
+- MUSIC=spotify: go-librespot on this Pi is a Spotify Connect speaker ("NextUp Stall 1").
+
+Either way the agent:
+
+- polls the player for what's playing and shows it on the screen's lyrics page, with synced
+  lyrics fetched from LRCLIB (the same free source the backend uses);
 - reads a hand raised to the radar as a gesture while music is on: up briefly, then away,
   plays or pauses; held for NEXT_S, skips to the next song. A Hurry pop-up always wins: while
   it shows, a raised hand answers the Hurry instead.
@@ -14,7 +19,9 @@ Nothing here talks to the NextUp API or database, so turning MUSIC off restores 
 """
 
 import asyncio
+import json
 import logging
+import pathlib
 import re
 import time
 
@@ -24,7 +31,6 @@ log = logging.getLogger("nextup.music")
 
 LRCLIB = "https://lrclib.net/api"
 LRC_STAMP = re.compile(r"\[(\d+):(\d+(?:\.\d+)?)\]")
-POLL_S = 1.0
 DRIFT_S = 1.5          # a jump in position bigger than this is a seek; smaller is polling jitter
 
 
@@ -52,6 +58,119 @@ def now_playing(status: dict | None) -> dict | None:
         "position_s": (track.get("position") or 0) / 1000,
         "playing": not status.get("paused") and not status.get("buffering"),
     }
+
+
+def web_now_playing(data: dict | None) -> dict | None:
+    """Spotify Web API GET /me/player/currently-playing → what the screen needs."""
+    item = (data or {}).get("item")
+    if not item or (data.get("currently_playing_type") or "track") != "track":
+        return None
+    return {
+        "uri": item.get("uri"),
+        "title": item.get("name") or "",
+        "artist": ", ".join(a.get("name", "") for a in item.get("artists") or []),
+        "album": (item.get("album") or {}).get("name"),
+        "duration_s": (item.get("duration_ms") or 0) / 1000 or None,
+        "position_s": (data.get("progress_ms") or 0) / 1000,
+        "playing": bool(data.get("is_playing")),
+    }
+
+
+class MusicError(Exception):
+    pass
+
+
+class LibrespotPlayer:
+    """go-librespot's local API on this Pi (MUSIC=spotify)."""
+
+    poll_s = 1.0
+
+    def __init__(self, api: str) -> None:
+        self.api = api.rstrip("/")
+
+    def describe(self) -> str:
+        return f"go-librespot at {self.api}"
+
+    async def status(self, client: httpx.AsyncClient) -> dict | None:
+        response = await client.get(f"{self.api}/status", timeout=3)
+        return now_playing(response.json()) if response.status_code == 200 else None
+
+    async def command(self, client: httpx.AsyncClient, action: str, playing: bool) -> None:
+        response = await client.post(f"{self.api}/player/{action}", timeout=3)
+        response.raise_for_status()
+
+
+class SpotifyWebPlayer:
+    """Follows one Spotify account through the Web API (MUSIC=spotify-web).
+
+    scripts/spotify_login.py signs the account in once and writes a refresh token to
+    SPOTIFY_TOKEN_FILE. Spotify rotates refresh tokens, so each new one is saved back there.
+    """
+
+    API = "https://api.spotify.com/v1"
+    TOKEN_URL = "https://accounts.spotify.com/api/token"
+    poll_s = 2.0  # the Web API is rate limited; gestures poll again right away
+
+    def __init__(self, client_id: str, token_file: pathlib.Path) -> None:
+        self.client_id, self.token_file = client_id, pathlib.Path(token_file)
+        self.access: str | None = None
+        self.expires = 0.0
+        self.retry_at = 0.0
+
+    def describe(self) -> str:
+        return f"Spotify Web API (token in {self.token_file})"
+
+    async def token(self, client: httpx.AsyncClient) -> str:
+        if self.access and time.time() < self.expires - 60:
+            return self.access
+        try:
+            saved = json.loads(self.token_file.read_text())
+        except (OSError, ValueError):
+            raise MusicError(f"not signed in to Spotify: run scripts/spotify_login.py and copy the token to "
+                             f"{self.token_file}") from None
+        response = await client.post(self.TOKEN_URL, timeout=10, data={
+            "grant_type": "refresh_token", "refresh_token": saved["refresh_token"], "client_id": self.client_id})
+        if response.status_code != 200:
+            raise MusicError(f"Spotify sign-in was refused ({response.status_code}): sign in again with "
+                             "scripts/spotify_login.py")
+        body = response.json()
+        self.access, self.expires = body["access_token"], time.time() + body.get("expires_in", 3600)
+        if body.get("refresh_token") and body["refresh_token"] != saved["refresh_token"]:
+            saved["refresh_token"] = body["refresh_token"]
+            tmp = self.token_file.with_suffix(".tmp")
+            tmp.write_text(json.dumps(saved))
+            tmp.chmod(0o600)
+            tmp.replace(self.token_file)
+        return self.access
+
+    async def request(self, client: httpx.AsyncClient, method: str, path: str) -> httpx.Response:
+        if time.time() < self.retry_at:
+            raise MusicError("waiting out Spotify's rate limit")
+        for attempt in (1, 2):
+            headers = {"Authorization": f"Bearer {await self.token(client)}"}
+            response = await client.request(method, self.API + path, headers=headers, timeout=8)
+            if response.status_code == 401 and attempt == 1:
+                self.access = None  # expired early: refresh once and retry
+                continue
+            if response.status_code == 429:
+                self.retry_at = time.time() + int(response.headers.get("Retry-After", "5"))
+                raise MusicError("Spotify rate limit")
+            return response
+        return response
+
+    async def status(self, client: httpx.AsyncClient) -> dict | None:
+        response = await self.request(client, "GET", "/me/player/currently-playing")
+        if response.status_code == 204:
+            return None
+        response.raise_for_status()
+        return web_now_playing(response.json())
+
+    async def command(self, client: httpx.AsyncClient, action: str, playing: bool) -> None:
+        method, path = (("POST", "/me/player/next") if action == "next"
+                        else ("PUT", "/me/player/pause") if playing else ("PUT", "/me/player/play"))
+        response = await self.request(client, method, path)
+        if response.status_code >= 400:
+            raise MusicError(f"Spotify said {response.status_code} to {path}: {response.text[:120]}")
 
 
 class Gesture:
@@ -95,10 +214,10 @@ class Gesture:
 
 
 class StallMusic:
-    """Keeps the screen's `local_music` in step with go-librespot and sends it gesture commands."""
+    """Keeps the screen's `local_music` in step with the player and sends it gesture commands."""
 
-    def __init__(self, api: str, kiosk) -> None:
-        self.api, self.kiosk = api.rstrip("/"), kiosk
+    def __init__(self, player, kiosk) -> None:
+        self.player, self.kiosk = player, kiosk
         self.gesture = Gesture()
         self.client: httpx.AsyncClient | None = None
         self.track: dict | None = None      # what the screen shows now
@@ -162,20 +281,19 @@ class StallMusic:
         warned = False
         while True:
             try:
-                response = await client.get(f"{self.api}/status", timeout=3)
-                np = now_playing(response.json()) if response.status_code == 200 else None
+                np = await self.player.status(client)
                 if np and np["uri"] not in self.lyrics:
                     asyncio.create_task(self.fetch_lyrics(np))
                 self.publish(np)
                 warned = False
-            except (httpx.HTTPError, ValueError) as exc:
+            except (httpx.HTTPError, ValueError, KeyError, MusicError) as exc:
                 if not warned:
-                    log.warning("music player not reachable at %s (%s): is nextup-spotify running?", self.api, exc)
+                    log.warning("can't read the music player (%s): %s", self.player.describe(), exc)
                     warned = True
                 self.publish(None)
             self.wake.clear()
             try:
-                await asyncio.wait_for(self.wake.wait(), POLL_S)
+                await asyncio.wait_for(self.wake.wait(), self.player.poll_s)
             except asyncio.TimeoutError:
                 pass
 
@@ -201,11 +319,11 @@ class StallMusic:
     async def command(self, action: str) -> None:
         if self.client is None:
             return
-        feedback = "next" if action == "next" else ("paused" if self.track and self.track["playing"] else "playing")
+        playing = bool(self.track and self.track["playing"])
+        feedback = "next" if action == "next" else ("paused" if playing else "playing")
         try:
-            response = await self.client.post(f"{self.api}/player/{action}", timeout=3)
-            response.raise_for_status()
-        except httpx.HTTPError as exc:
+            await self.player.command(self.client, action, playing)
+        except (httpx.HTTPError, MusicError) as exc:
             log.warning("music %s failed: %s", action, exc)
             return
         log.info("music: %s (radar gesture)", action)
