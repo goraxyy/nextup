@@ -1,0 +1,17 @@
+# Never upload secrets or local state
+.env*
+devices.local.json
+.venv
+**/node_modules
+**/__pycache__
+.pytest_cache
+supabase
+web/dist
+# Not needed by the deployment
+docs
+tests
+sim
+scripts
+tiger
+docker-compose.yml
+requirements-dev.txt

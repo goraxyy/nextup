@@ -1,0 +1,20 @@
+# Local database for development and tests: the same Postgres + TimescaleDB that Tiger runs.
+#   docker compose up -d db
+#   DATABASE_URL=postgresql://postgres:nextup@localhost:5433/nextup
+services:
+  db:
+    image: timescale/timescaledb:latest-pg17
+    environment:
+      POSTGRES_PASSWORD: nextup
+      POSTGRES_DB: nextup
+    ports:
+      - "5433:5432"
+    volumes:
+      - nextup-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 2s
+      retries: 30
+
+volumes:
+  nextup-db:

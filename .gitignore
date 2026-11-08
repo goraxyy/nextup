@@ -1,0 +1,11 @@
+.vercel
+.env*
+!.env.example
+.env.supabase-db
+supabase/.temp/
+devices.local.json
+.venv/
+__pycache__/
+.pytest_cache/
+node_modules/
+web/dist/
