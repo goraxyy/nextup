@@ -1,59 +1,69 @@
-# NextUp screen use cases
+# NextUp station screens
 
-The screen has no touch. The only input inside the stall is a hand held up in front of the radar
-for about 2 seconds. Output is the screen plus the room speaker.
+The screen has no touch. The only input at a station is a hand held up in front of the radar for
+about 2 seconds, so it works with gloves on. Output is the screen plus a speaker for chimes and
+short spoken prompts.
 
-## 1. Campus events
+## Station kinds
 
-- Source: Columbia's university calendar runs on Bedework (`events.columbia.edu`, `eventsFeed.do`
-  with iCal or JSON output), plus per-group ICS calendars.
-- Each event becomes a one-line card built from its title, time and place.
-- Filters: tonight, free food, career, arts, sports. Late at night, only next-morning events.
-- Each card shows a short link (`/e/abc`) so it can be found on the website afterwards.
+| Kind | Examples | Features on |
+|---|---|---|
+| Bench | Soldering bench, electronics bench, workbench | Queue, Notify, lone-worker check |
+| Machine | Laser cutter, CNC, band saw (attended machines) | Queue, Notify, lone-worker check |
+| Lab station | Fume hood, biosafety cabinet, microscope, microtome | Queue, Notify, lone-worker check, protocol stepper |
+| Robot cell | Robot arm, pick station | Robot zone, handoff, intrusion log |
 
-## 2. Lyrics, and sharing one speaker
+Machines that run unattended, like 3D printers, aren't a good fit: the radar sees the person, not
+the machine.
 
-- Music plays from a room audio host (MPD). Every screen in the room shows the same synced lyric
-  line from LRCLIB.
-- **Can several devices share one speaker?** Yes, with one Pi in the room as the audio host driving
-  the speaker. The other stalls' screens don't play audio; they follow a shared "now playing" clock
-  (track plus start time) from the server, kept accurate by NTP time sync on every Pi.
-- **Several speakers in one room?** Use Snapcast so all speakers play in sync (within a few
-  milliseconds). Without it, unsynced speakers echo against each other.
-- **Bluetooth:** a Bluetooth speaker normally takes one source at a time, so several Pis can't share
-  one Bluetooth speaker.
-- Floor radio: residents queue songs and dedications from the website. Holding a hand up during a
-  song votes to skip it.
+## What the screen shows
 
-## 3. Wellness
+Higher in the list wins when two things happen at once.
 
-- Box-breathing card: a square traced over 16 s (4 in, 4 hold, 4 out, 4 hold).
-- Time-of-day cards: sleep tips after midnight, hydration in the morning.
-- Finals-week mode: shorter, calmer cards and campus support resources (names and hours verified
-  from Columbia Health).
-- Kind notes from the floor ("good luck on your exam today"), approved before display.
+1. **"You OK?"** Full screen, a chime, and the hold ring. Raise a hand to answer.
+2. **Robot zone** (robot cells only): a big green, yellow or red ring with a short label ("Robot
+   slowed: person nearby").
+3. **Notify pop-up:** "Someone's waiting for this station." A chime and the hold ring; raise a hand
+   to say you've seen it.
+4. **Out of order:** "Reported: broken. A manager has been told." The queue skips this station.
+5. **Reserved:** "Reserved for the next person: 1:42", counting down the 2 minutes they have to
+   claim it.
+6. **Protocol step:** the current step large, the next step dimmed, and a timer for timed steps.
+7. **In use:** minutes in, how many people are waiting, and a soft hint when someone is.
+8. **Free:** "Free. Join the queue at labstat.us", with the lab's join code.
+9. **Sensor offline:** shown when the radar stops sending frames.
 
-## 4. Fun and entertainment
+## Hand-hold map
 
-- Karaoke mode with sing-along emphasis on the current line.
-- Duet mode: two occupied stalls in a room get alternating lyric lines.
-- Trivia between songs, answer revealed after 20 s.
-- Name that tune: 5-second intro, then the reveal.
-- Floor-wide story: one pre-written chapter per session, read aloud; hold a hand up for path A or
-  do nothing for path B, and the next person hears what happens.
-- Shower oracle: hold a hand up for a silly fortune.
-- Joke of the day with a rimshot.
-- Soundscapes: rainforest, beach, rooftop rain, with matching visuals.
-- Countdown cards to breaks and campus traditions.
-- Song dedications "for whoever's next" from the floor radio.
+| On screen | A 2 s hand-hold does |
+|---|---|
+| "You OK?" | Answers "I'm OK" (`safety.ok`) |
+| Notify pop-up | "I've seen it" (`notify.ack`) |
+| Protocol step | Next step |
+| "Start protocol?" | Starts the run |
+| Robot cell, green zone | Tells the robot to start its next task |
+| Anything else | Nothing |
 
-## 5. Ask the board (website)
+The screen always shows the current hint ("Raise a hand to …") and fills a ring as the hold
+progresses.
 
-A chat box on the website, powered by the Gemini API. Gemini answers by calling NextUp's own
-APIs (stall status, busy hours, wait estimate, events, wellness resources, now playing), so the
-answers come from live data. Examples:
+## Spoken prompts
 
-- "When should I shower before my 9 a.m.?"
-- "Is anything free right now?"
-- "What's on campus tonight with free food?"
-- "What's playing in room 1?"
+Short clips made ahead of time with an offline text-to-speech tool (for example Piper). Nothing is
+generated live.
+
+- "Are you OK? Raise a hand."
+- "Someone's waiting for this station."
+- "This station is reserved for the next person."
+- "Step complete."
+
+## Ask the lab (website)
+
+A chat box on the website, powered by the Gemini API. Gemini answers by calling NextUp's own read
+APIs, so answers come from live data. It never reveals who is at a station or anything about safety
+checks. Examples:
+
+- "Is a soldering bench free?"
+- "When is the laser cutter usually free tomorrow?"
+- "How long is the wait for a fume hood?"
+- "Which machines are out of order?"
