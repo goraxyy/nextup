@@ -6,7 +6,9 @@
 <title>NextUp stall</title>
 <style>
   /* Columbia palette (visualidentity.columbia.edu): navy #003087, Columbia Blue #B9D9EB (dark
-     text only), accent #C75000, transactional green #228848. Fonts are bundled for offline use. */
+     text only), accent #C75000, transactional green #228848. Fonts are bundled for offline use.
+     Everything is laid out on an 800 × 480 stage (the stall's screen) and scaled to fit, so the
+     same layout works on a 1024 × 600 screen too. */
   @font-face { font-family: "EB Garamond"; font-weight: 400; src: url(fonts/eb-garamond-latin-400-normal.woff2) format("woff2"); }
   @font-face { font-family: "EB Garamond"; font-weight: 600; src: url(fonts/eb-garamond-latin-600-normal.woff2) format("woff2"); }
   @font-face { font-family: "Montserrat"; font-weight: 400; src: url(fonts/montserrat-latin-400-normal.woff2) format("woff2"); }
@@ -16,185 +18,316 @@
 
   :root {
     --navy: #003087; --navy-deep: #00205c; --cu-blue: #B9D9EB; --sky: #6CACE4; --bright: #0077C8;
-    --accent: #C75000; --green: #228848; --ink: #222222; --white: #ffffff;
+    --accent: #C75000; --accent-soft: #ffb37a; --green: #228848; --white: #ffffff;
+    --muted: rgba(185, 217, 235, 0.72); --glass: rgba(185, 217, 235, 0.12); --track: #1d3266;
     --serif: "EB Garamond", Garamond, "Times New Roman", serif;
     --sans: Montserrat, Arial, sans-serif;
+    --s: 1;
   }
   * { box-sizing: border-box; }
   [hidden] { display: none !important; }
-  html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; color: var(--white);
-               font-family: var(--sans); font-size: 18px; line-height: 1.5;
-               background: radial-gradient(circle at 20% 0%, #0a3a99 0%, var(--navy-deep) 55%, #001339 100%); }
+  html, body { margin: 0; height: 100%; overflow: hidden; cursor: none; background: #001339; }
+  body { color: var(--white); font-family: var(--sans); font-size: 18px; line-height: 1.4; }
 
-  .top { position: absolute; top: 0; left: 0; right: 0; height: 64px; display: flex; align-items: center;
-         gap: 20px; padding: 0 32px; background: rgba(0, 48, 135, 0.85); border-bottom: 4px solid var(--cu-blue); z-index: 2; }
-  .top .brand { font-family: var(--serif); font-size: 28px; font-weight: 600; }
-  .top .name { font-size: 20px; font-weight: 700; color: var(--white); }
-  .top .state { font-size: 17px; font-weight: 700; padding: 4px 14px; border-radius: 999px; letter-spacing: 0.04em; }
-  .top .state.free { background: var(--green); color: var(--white); }
-  .top .state.in_use { background: var(--cu-blue); color: var(--navy); }
-  .top .waiting { font-size: 16px; font-weight: 600; color: var(--cu-blue); flex: 1; }
-  .top .clock { font-size: 24px; font-weight: 600; }
-  .top .dots { font-size: 14px; color: var(--cu-blue); }
-  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #5b6b8c; margin: 0 6px 0 14px; }
-  .dot.on { background: #4ade80; }
+  #stage { position: absolute; left: 50%; top: 50%; width: 800px; height: 480px; overflow: hidden;
+           transform: translate(-50%, -50%) scale(var(--s));
+           background: radial-gradient(circle at 15% 0%, #0b3c9e 0%, var(--navy-deep) 55%, #001339 100%); }
+  .ico { width: 1em; height: 1em; flex: none; fill: none; stroke: currentColor; stroke-width: 2;
+         stroke-linecap: round; stroke-linejoin: round; vertical-align: -0.14em; }
+  .ico.solid { fill: currentColor; stroke: none; }
 
-  .page { position: absolute; top: 68px; bottom: 44px; left: 0; right: 0; padding: 28px 48px;
-          opacity: 0; transform: translateY(8px); transition: opacity 0.6s ease, transform 0.6s ease; display: flex; }
+  /* Top bar */
+  .top { position: absolute; top: 0; left: 0; right: 0; height: 52px; display: flex; align-items: center; gap: 14px;
+         padding: 0 22px; background: rgba(0, 48, 135, 0.9); border-bottom: 3px solid var(--cu-blue); z-index: 2; }
+  .brand { font-family: var(--serif); font-size: 25px; font-weight: 600; letter-spacing: 0.01em; }
+  .sep { width: 1px; height: 22px; background: rgba(185, 217, 235, 0.35); }
+  .top .name { font-size: 16px; font-weight: 600; }
+  .state { font-size: 14px; font-weight: 700; padding: 3px 12px; border-radius: 999px; white-space: nowrap; }
+  .state.free { background: var(--green); color: var(--white); }
+  .state.in_use { background: var(--cu-blue); color: var(--navy); }
+  .spacer { flex: 1; }
+  .wait-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--navy);
+               background: var(--accent-soft); padding: 3px 12px 3px 9px; border-radius: 999px; white-space: nowrap; }
+  .health { display: flex; gap: 8px; font-size: 18px; color: #5b6b8c; }
+  .health .on { color: #4ade80; }
+  .clock { font-size: 21px; font-weight: 600; font-variant-numeric: tabular-nums; min-width: 86px; text-align: right; white-space: nowrap; }
+
+  /* Pages */
+  .page { position: absolute; top: 55px; bottom: 26px; left: 0; right: 0; padding: 18px 36px;
+          opacity: 0; transform: translateY(10px); transition: opacity 0.6s ease, transform 0.6s ease; pointer-events: none; }
   .page.show { opacity: 1; transform: none; }
-  .center { flex-direction: column; justify-content: center; align-items: center; text-align: center; }
-  .kicker { font-size: 16px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cu-blue); }
+  #stage.reserved .page { bottom: 46px; }
+  #stage.reserved .pagedots { display: none; }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--cu-blue);
+            display: flex; align-items: center; gap: 8px; }
+  h2 { font-family: var(--serif); font-weight: 600; margin: 0; line-height: 1.04; text-wrap: balance; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { display: inline-flex; align-items: center; gap: 7px; font-size: 15px; color: var(--cu-blue); background: var(--glass);
+          border-radius: 999px; padding: 5px 13px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .chip b { color: var(--white); font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
+  .chip .ico { font-size: 17px; }
 
   /* Status */
-  .pill { display: inline-block; padding: 8px 28px; border-radius: 999px; font-weight: 700;
-          font-size: 24px; letter-spacing: 0.1em; text-transform: uppercase; }
+  .status { display: grid; grid-template-columns: 236px 1fr; gap: 34px; align-items: center; }
+  .visual { position: relative; width: 236px; height: 236px; display: grid; place-items: center; }
+  .free-badge { width: 176px; height: 176px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #2fa95c, var(--green) 70%);
+                display: grid; place-items: center; position: relative; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35); }
+  .free-badge .ico { font-size: 92px; stroke-width: 1.6; color: var(--white); }
+  .ripple { position: absolute; inset: 30px; border-radius: 50%; border: 3px solid rgba(47, 169, 92, 0.6); animation: ripple 3s ease-out infinite; }
+  .ripple.two { animation-delay: 1.5s; }
+  @keyframes ripple { from { transform: scale(0.95); opacity: 1; } to { transform: scale(1.32); opacity: 0; } }
+  .timer { width: 236px; height: 236px; }
+  .timer circle { fill: none; stroke-width: 16; }
+  .timer .track { stroke: var(--track); }
+  .timer .fill { stroke: var(--cu-blue); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
+                 transition: stroke-dashoffset 0.9s linear, stroke 0.6s; }
+  .timer.over .fill { stroke: var(--accent); }
+  .timer-text { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .timer-text b { font-size: 54px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+  .timer-text span { margin-top: 8px; font-size: 12px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .pill { display: inline-block; padding: 4px 16px; border-radius: 999px; font-weight: 700; font-size: 15px;
+          letter-spacing: 0.12em; text-transform: uppercase; }
   .pill.free { background: var(--green); color: var(--white); }
   .pill.in_use { background: var(--cu-blue); color: var(--navy); }
-  .big { font-family: var(--serif); font-size: 80px; font-weight: 600; line-height: 1.05; margin: 22px 0 10px; }
-  .sub { font-size: 26px; color: var(--cu-blue); }
-  .hint { margin-top: 26px; display: inline-flex; gap: 10px; align-items: center; font-size: 20px; color: var(--cu-blue);
-          background: rgba(185, 217, 235, 0.12); border-radius: 999px; padding: 8px 20px; }
-  .hint b { color: var(--white); }
+  .status h2 { font-size: 52px; margin: 12px 0 8px; }
+  .status .sub { font-size: 20px; color: var(--cu-blue); }
+  .queue { display: flex; align-items: center; gap: 4px; margin: 14px 0 16px; min-height: 36px; color: var(--accent-soft); font-size: 34px; }
+  .queue .more { font-size: 20px; font-weight: 700; margin-left: 6px; }
+  .queue.empty { color: rgba(185, 217, 235, 0.35); }
 
   /* Event */
-  .event { align-items: center; gap: 40px; }
-  .event .photo { width: 470px; height: 400px; flex: none; border-radius: 22px; overflow: hidden;
-                  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45); background: var(--navy); position: relative; }
-  .event .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
-  .event .photo img.backdrop { object-fit: cover; filter: blur(20px) brightness(0.55); transform: scale(1.15); }
-  .badge { position: absolute; top: 14px; left: 14px; background: var(--green); color: var(--white); font-size: 15px; font-weight: 700;
-           text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 14px; border-radius: 999px; }
-  .event .text { flex: 1; min-width: 0; }
-  .event h2 { font-family: var(--serif); font-size: 50px; font-weight: 600; line-height: 1.1; margin: 12px 0 18px;
-              display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
-  .event .when { font-size: 26px; font-weight: 700; }
-  .event .where { font-size: 22px; color: var(--cu-blue); margin-top: 6px; }
-  .tags { margin-top: 18px; display: flex; gap: 10px; flex-wrap: wrap; }
-  .tag { background: var(--cu-blue); color: var(--navy); font-weight: 700; font-size: 15px;
-         padding: 4px 14px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
-  .credit { position: absolute; right: 48px; bottom: 8px; font-size: 13px; color: rgba(185, 217, 235, 0.7); }
+  .event { display: grid; grid-template-columns: 330px 1fr; gap: 28px; align-items: center; }
+  .photo { width: 330px; height: 338px; border-radius: 20px; overflow: hidden; position: relative;
+           box-shadow: 0 16px 44px rgba(0, 0, 0, 0.45); background: var(--navy); }
+  .photo img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block; }
+  .photo img.backdrop { object-fit: cover; filter: blur(20px) brightness(0.55); transform: scale(1.15); }
+  .badge { position: absolute; top: 12px; left: 12px; background: var(--green); color: var(--white); font-size: 13px; font-weight: 700;
+           text-transform: uppercase; letter-spacing: 0.08em; padding: 4px 12px; border-radius: 999px; }
+  .event .text { min-width: 0; display: flex; flex-direction: column; }
+  .event h2 { font-size: 40px; margin: 10px 0 16px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .meta { display: flex; align-items: center; gap: 10px; font-size: 19px; margin-top: 6px; min-width: 0; }
+  .meta span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .meta .ico { font-size: 22px; color: var(--cu-blue); }
+  .meta.when { font-weight: 700; }
+  .meta.where { color: var(--cu-blue); }
+  .tags { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag { background: var(--cu-blue); color: var(--navy); font-weight: 700; font-size: 12px;
+         padding: 3px 12px; border-radius: 999px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .credit { margin-top: 18px; font-size: 12px; color: rgba(185, 217, 235, 0.6); }
 
   /* Best time */
-  .best { flex-direction: column; justify-content: center; gap: 6px; }
-  .best h2 { font-family: var(--serif); font-size: 64px; font-weight: 600; margin: 4px 0 6px; line-height: 1.05; }
-  .chips { display: flex; gap: 14px; align-items: center; font-size: 22px; color: var(--cu-blue); }
-  .chips span.time { background: var(--white); color: var(--navy); font-weight: 700; font-size: 24px; padding: 6px 18px; border-radius: 14px; }
-  .bars { margin-top: 26px; display: grid; grid-template-columns: repeat(24, 1fr); gap: 6px; align-items: end; height: 150px; }
-  .bars i { display: block; border-radius: 4px 4px 0 0; background: var(--sky); min-height: 3px; }
+  .best { display: flex; flex-direction: column; }
+  .best .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-top: 6px; }
+  .best h2 { font-size: 50px; display: flex; align-items: center; gap: 14px; }
+  .mood-dot { width: 18px; height: 18px; border-radius: 50%; background: var(--sky); box-shadow: 0 0 0 6px rgba(108, 172, 228, 0.25); }
+  .mood-dot.quiet { background: #4ade80; box-shadow: 0 0 0 6px rgba(74, 222, 128, 0.2); }
+  .mood-dot.busy { background: var(--accent-soft); box-shadow: 0 0 0 6px rgba(255, 179, 122, 0.22); }
+  .best .stat { text-align: right; font-size: 14px; color: var(--muted); line-height: 1.3; }
+  .best .stat b { display: block; font-size: 26px; color: var(--white); font-weight: 700; }
+  .times { display: flex; gap: 10px; align-items: center; margin-top: 14px; font-size: 16px; color: var(--cu-blue); }
+  .time { background: var(--white); color: var(--navy); border-radius: 12px; padding: 5px 14px; line-height: 1.2; text-align: center; }
+  .time b { display: block; font-size: 19px; }
+  .time small { font-size: 12px; font-weight: 600; color: #4a5b80; }
+  .chart { position: relative; margin-top: auto; }
+  .bars { display: grid; grid-template-columns: repeat(24, 1fr); gap: 5px; align-items: end; height: 122px;
+          border-bottom: 2px solid rgba(185, 217, 235, 0.3); }
+  .bars i { position: relative; display: block; border-radius: 4px 4px 0 0; background: #2f6fc0; min-height: 3px; }
+  .bars i.past { opacity: 0.4; }
+  .bars i.good { background: var(--cu-blue); }
   .bars i.now { background: var(--white); }
-  .bar-labels { display: grid; grid-template-columns: repeat(24, 1fr); gap: 6px; font-size: 13px; color: var(--cu-blue); margin-top: 6px; }
+  .bars i.now::before { content: "Now"; position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%);
+                        font-size: 11px; font-weight: 700; font-style: normal; color: var(--navy); background: var(--white);
+                        padding: 1px 6px; border-radius: 6px; }
+  .bar-labels { display: grid; grid-template-columns: repeat(24, 1fr); gap: 5px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .bar-labels span { white-space: nowrap; }
 
   /* Lyrics */
-  .lyrics { flex-direction: column; justify-content: center; }
-  .lyrics .song { font-size: 22px; color: var(--cu-blue); margin-top: 6px; }
-  .lyrics .song b { color: var(--white); }
-  .lyrics .line { font-family: var(--serif); margin: 0; line-height: 1.15; }
-  .lyrics .prev, .lyrics .next { font-size: 34px; color: rgba(185, 217, 235, 0.45); }
-  .lyrics .current { font-size: 64px; font-weight: 600; margin: 14px 0; }
-  .lyrics .lines { margin-top: 28px; }
-  .songbar { margin-top: 30px; height: 6px; border-radius: 6px; background: rgba(185, 217, 235, 0.2); overflow: hidden; }
+  .lyrics { display: flex; flex-direction: column; }
+  .np { display: flex; align-items: center; gap: 20px; }
+  .disc { width: 92px; height: 92px; flex: none; border-radius: 50%; position: relative; animation: spin 6s linear infinite;
+          background: repeating-radial-gradient(circle, #0d0f18 0 2px, #1a1e2c 2px 4px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); }
+  .disc::after { content: ""; position: absolute; inset: 30px; border-radius: 50%; background: var(--cu-blue);
+                 box-shadow: inset 0 0 0 9px var(--sky); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .eq { display: inline-flex; gap: 2px; align-items: flex-end; height: 12px; }
+  .eq i { width: 3px; background: var(--cu-blue); animation: eq 0.9s ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; }
+  @keyframes eq { from { height: 3px; } to { height: 12px; } }
+  .np .title { font-family: var(--serif); font-size: 32px; font-weight: 600; line-height: 1.1; margin-top: 4px;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np .artist { font-size: 17px; color: var(--cu-blue); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .np > div { min-width: 0; }
+  .lines { margin-top: 20px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+  .lines p { font-family: var(--serif); margin: 0; line-height: 1.15; }
+  .lines .prev, .lines .next { font-size: 26px; color: rgba(255, 255, 255, 0.4);
+                               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lines .current { font-size: 46px; font-weight: 600; color: var(--cu-blue); margin: 10px 0;
+                    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .songbar { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .songbar div { flex: 1; height: 5px; border-radius: 5px; background: rgba(185, 217, 235, 0.2); overflow: hidden; }
   .songbar i { display: block; height: 100%; background: var(--cu-blue); }
 
-  .pagedots { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; }
-  .pagedots i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 5px; background: #3a4f80; transition: all 0.3s; }
-  .pagedots i.on { background: var(--cu-blue); width: 26px; border-radius: 9px; }
-  .banner { position: absolute; bottom: 0; left: 0; right: 0; height: 56px; display: grid; place-items: center;
-            background: var(--cu-blue); color: var(--navy); font-size: 22px; font-weight: 700; z-index: 3; }
+  .pagedots { position: absolute; bottom: 9px; left: 0; right: 0; text-align: center; line-height: 0; }
+  .pagedots i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin: 0 4px; background: #3a4f80; transition: all 0.3s; }
+  .pagedots i.on { background: var(--cu-blue); width: 24px; border-radius: 8px; }
+  .banner { position: absolute; bottom: 0; left: 0; right: 0; height: 46px; display: flex; align-items: center; justify-content: center;
+            gap: 10px; background: var(--cu-blue); color: var(--navy); font-size: 19px; font-weight: 700; z-index: 3; }
+  .banner .ico { font-size: 22px; }
+  .banner b { font-variant-numeric: tabular-nums; }
 
   /* Interruptions */
   .overlay { position: absolute; inset: 0; display: none; z-index: 5; background: var(--navy-deep);
-             flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 40px; }
+             flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 24px; }
   .overlay.show { display: flex; }
-  #hurry { border: 14px solid var(--accent); background: radial-gradient(circle at 50% 30%, #3a1800 0%, var(--navy-deep) 60%); }
+  #hurry { border: 10px solid var(--accent); background: radial-gradient(circle at 50% 25%, #4a1f00 0%, var(--navy-deep) 62%); }
   #hurry.flash { animation: flash 0.7s ease-in-out 4; }
   @keyframes flash { 50% { border-color: var(--navy-deep); background: #3a1800; } }
-  #hurry .kicker { color: #ffb37a; font-size: 22px; }
-  #hurry h1 { font-family: var(--serif); font-size: 76px; font-weight: 600; line-height: 1.05; margin: 10px 0 6px; }
-  #hurry .line { font-size: 24px; color: var(--cu-blue); }
-  .holdrow { display: flex; align-items: center; gap: 28px; margin-top: 26px; }
-  .ring { width: 150px; height: 150px; flex: none; }
+  .bell { width: 64px; height: 64px; border-radius: 50%; background: var(--accent); display: grid; place-items: center;
+          font-size: 34px; animation: ring 2.4s ease-in-out infinite; box-shadow: 0 0 0 10px rgba(199, 80, 0, 0.25); }
+  @keyframes ring { 0%, 70%, 100% { transform: rotate(0); } 75% { transform: rotate(14deg); } 82% { transform: rotate(-12deg); }
+                    89% { transform: rotate(8deg); } 95% { transform: rotate(-4deg); } }
+  #hurry .kicker { color: var(--accent-soft); font-size: 16px; margin-top: 14px; justify-content: center; }
+  #hurry h1 { font-family: var(--serif); font-size: 56px; font-weight: 600; line-height: 1.05; margin: 6px 0 10px; }
+  #hurry .chip { font-size: 17px; }
+  .holdrow { display: flex; align-items: center; gap: 22px; margin-top: 18px; }
+  .ring { width: 118px; height: 118px; flex: none; }
   .ring circle { fill: none; stroke-width: 16; }
-  .ring .track { stroke: #24345c; }
+  .ring .track { stroke: #3a2a35; }
   .ring .fill { stroke: var(--accent); stroke-linecap: round; transform: rotate(-90deg); transform-origin: 50% 50%;
                 transition: stroke-dashoffset 0.15s linear; }
-  .ring text { fill: var(--white); font: 700 44px var(--sans); text-anchor: middle; dominant-baseline: central; }
-  #hold-hint { font-size: 24px; max-width: 520px; text-align: left; }
-  #thanks h1 { font-family: var(--serif); font-size: 84px; margin: 16px 0 8px; }
-  #thanks p { font-size: 28px; color: var(--cu-blue); margin: 0; }
-  .check { width: 124px; height: 124px; border-radius: 50%; background: var(--green); display: grid; place-items: center;
-           font-size: 72px; font-weight: 700; box-shadow: 0 0 0 14px rgba(34, 136, 72, 0.25); }
+  .ring text { fill: var(--white); font: 700 52px var(--sans); text-anchor: middle; dominant-baseline: central; }
+  .hold-hint { display: flex; align-items: center; gap: 14px; max-width: 400px; text-align: left; font-size: 19px; line-height: 1.35; }
+  .hold-hint .ico { font-size: 44px; color: var(--accent-soft); stroke-width: 1.6; }
+  #no-hold { font-size: 20px; color: var(--cu-blue); margin-top: 18px; max-width: 520px; }
+  #thanks h1 { font-family: var(--serif); font-size: 72px; margin: 18px 0 4px; }
+  #thanks p { font-size: 22px; color: var(--cu-blue); margin: 0; }
+  .check { width: 112px; height: 112px; border-radius: 50%; background: var(--green); display: grid; place-items: center;
+           font-size: 64px; box-shadow: 0 0 0 14px rgba(34, 136, 72, 0.25); animation: pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1); }
+  .check .ico { stroke-width: 3; }
+  @keyframes pop { from { transform: scale(0.4); opacity: 0; } }
+  #boot { background: radial-gradient(circle at 15% 0%, #0b3c9e 0%, var(--navy-deep) 55%, #001339 100%); }
+  #boot .brand { font-size: 64px; }
+  #boot p { color: var(--cu-blue); font-size: 20px; margin: 6px 0 0; }
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+  <symbol id="i-shower" viewBox="0 0 24 24"><path d="M4 21V7a3 3 0 0 1 3-3h2a3 3 0 0 1 3 3v1"/><path d="M8 8h8l1.5 3h-11z"/>
+    <path d="M8 14.5v.5M12 14.5v.5M16 14.5v.5M7 18.5v.5M11 18.5v.5M15 18.5v.5M18 18.5v.5"/></symbol>
+  <symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7.5" r="4"/><path d="M4 21a8 8 0 0 1 16 0z"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2.5"/><path d="M3 10h18M8 3v4M16 3v4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 9a6 6 0 0 1 12 0c0 6.5 3 8.5 3 8.5H3s3-2 3-8.5"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M8 13V5.5a1.5 1.5 0 0 1 3 0V11M11 10.5V3.5a1.5 1.5 0 0 1 3 0V11M14 10.5V5a1.5 1.5 0 0 1 3 0v6.5M17 9a1.5 1.5 0 0 1 3 0v5a8 8 0 0 1-8 8h-.5a7 7 0 0 1-5.4-2.6L3.3 16a1.7 1.7 0 0 1 2.6-2.2L8 16"/></symbol>
+  <symbol id="i-sensor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="2"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M4.9 4.9a10 10 0 0 0 0 14.2M19.1 4.9a10 10 0 0 1 0 14.2"/></symbol>
+  <symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8.8a15 15 0 0 1 20 0M5 12.4a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M12 19.5h.01"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/></symbol>
+</svg>
+
+<div id="stage">
   <div class="top">
     <span class="brand">NextUp</span>
+    <span class="sep"></span>
     <span class="name" id="name">Stall</span>
     <span class="state" id="top-state"></span>
-    <span class="waiting" id="top-waiting"></span>
+    <span class="spacer"></span>
+    <span class="wait-chip" id="top-waiting" hidden><svg class="ico solid"><use href="#i-person"/></svg><span></span></span>
+    <span class="health"><svg class="ico" id="sensor"><use href="#i-sensor"/></svg><svg class="ico" id="online"><use href="#i-wifi"/></svg></span>
     <span class="clock" id="clock"></span>
-    <span class="dots"><i class="dot" id="sensor"></i>sensor<i class="dot" id="online"></i>online</span>
   </div>
 
-  <section class="page center" id="page-status">
-    <span class="pill" id="pill">…</span>
-    <div class="big" id="big"></div>
-    <div class="sub" id="sub"></div>
-    <div class="hint" id="status-hint" hidden></div>
+  <section class="page status" id="page-status">
+    <div class="visual">
+      <div id="st-free"><span class="ripple"></span><span class="ripple two"></span>
+        <div class="free-badge"><svg class="ico"><use href="#i-shower"/></svg></div></div>
+      <div id="st-busy" hidden>
+        <svg class="timer" id="timer" viewBox="0 0 236 236"><circle class="track" cx="118" cy="118" r="100"/>
+          <circle class="fill" id="timer-fill" cx="118" cy="118" r="100" stroke-dasharray="628.32" stroke-dashoffset="628.32"/></svg>
+        <div class="timer-text"><b id="timer-time">0:00</b><span>in the shower</span></div>
+      </div>
+    </div>
+    <div>
+      <span class="pill" id="pill">…</span>
+      <h2 id="big"></h2>
+      <div class="sub" id="sub"></div>
+      <div class="queue" id="queue"></div>
+      <div class="chips" id="status-chips"></div>
+    </div>
   </section>
 
   <section class="page event" id="page-event">
     <div class="photo"><img id="ev-bg" class="backdrop" alt="" aria-hidden="true"><img id="ev-img" alt=""><span class="badge" id="ev-badge" hidden>Free food</span></div>
     <div class="text">
-      <div class="kicker">On campus</div>
+      <div class="kicker"><svg class="ico"><use href="#i-sparkle"/></svg>On campus</div>
       <h2 id="ev-title"></h2>
-      <div class="when" id="ev-when"></div>
-      <div class="where" id="ev-where"></div>
+      <div class="meta when"><svg class="ico"><use href="#i-calendar"/></svg><span id="ev-when"></span></div>
+      <div class="meta where"><svg class="ico"><use href="#i-pin"/></svg><span id="ev-where"></span></div>
       <div class="tags" id="ev-tags"></div>
+      <div class="credit">Columbia University Events</div>
     </div>
-    <div class="credit">Columbia University Events</div>
   </section>
 
   <section class="page best" id="page-best">
-    <div class="kicker">Best time to shower</div>
-    <h2 id="best-title"></h2>
-    <div class="chips" id="best-chips"></div>
-    <div class="bars" id="best-bars"></div>
-    <div class="bar-labels" id="best-labels"></div>
+    <div class="kicker"><svg class="ico"><use href="#i-clock"/></svg>Best time to shower</div>
+    <div class="head">
+      <h2><span class="mood-dot" id="mood-dot"></span><span id="best-title"></span></h2>
+      <div class="stat" id="best-stat"></div>
+    </div>
+    <div class="times" id="best-chips"></div>
+    <div class="chart"><div class="bars" id="best-bars"></div><div class="bar-labels" id="best-labels"></div></div>
   </section>
 
   <section class="page lyrics" id="page-lyrics">
-    <div class="kicker" id="ly-kicker">Now playing</div>
-    <div class="song" id="ly-song"></div>
-    <div class="lines">
-      <p class="line prev" id="ly-prev"></p>
-      <p class="line current" id="ly-current"></p>
-      <p class="line next" id="ly-next"></p>
+    <div class="np">
+      <div class="disc"></div>
+      <div>
+        <div class="kicker"><span class="eq"><i></i><i></i><i></i></span>Now playing</div>
+        <div class="title" id="ly-title"></div>
+        <div class="artist" id="ly-artist"></div>
+      </div>
     </div>
-    <div class="songbar"><i id="ly-bar"></i></div>
+    <div class="lines">
+      <p class="prev" id="ly-prev"></p>
+      <p class="current" id="ly-current"></p>
+      <p class="next" id="ly-next"></p>
+    </div>
+    <div class="songbar"><span id="ly-pos">0:00</span><div><i id="ly-bar"></i></div><span id="ly-dur"></span></div>
   </section>
 
   <div class="pagedots" id="pagedots"></div>
-  <div class="banner" id="reserved" hidden></div>
+  <div class="banner" id="reserved" hidden><svg class="ico"><use href="#i-clock"/></svg><span>Held for the next person in line</span><b id="reserved-left"></b></div>
 
   <div class="overlay" id="hurry">
+    <div class="bell"><svg class="ico"><use href="#i-bell"/></svg></div>
     <div class="kicker">Someone's waiting</div>
     <h1>Please start wrapping up</h1>
-    <div class="line" id="hurry-line"></div>
+    <span class="chip" id="hurry-line" hidden><svg class="ico solid"><use href="#i-person"/></svg><b></b></span>
     <div class="holdrow" id="holdrow">
       <svg class="ring" viewBox="0 0 200 200"><circle class="track" cx="100" cy="100" r="80"/>
         <circle class="fill" id="ring" cx="100" cy="100" r="80" stroke-dasharray="502.65" stroke-dashoffset="502.65"/>
         <text x="100" y="100" id="ring-secs">5</text></svg>
-      <div id="hold-hint"></div>
+      <div class="hold-hint"><svg class="ico"><use href="#i-hand"/></svg><span id="hold-hint"></span></div>
     </div>
-    <div class="line" id="no-hold" hidden>They've been told this is on your screen. Thanks!</div>
+    <div id="no-hold" hidden>They've been told this is on your screen. Thanks!</div>
   </div>
-  <div class="overlay" id="thanks"><div class="check">✓</div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
+  <div class="overlay" id="thanks"><div class="check"><svg class="ico"><use href="#i-check"/></svg></div><h1>Thanks!</h1><p>They know you've seen it. No rush.</p></div>
+  <div class="overlay show" id="boot"><span class="brand">NextUp</span><p id="boot-text">Starting the stall screen…</p></div>
+</div>
 
 <script>
   const $ = (id) => document.getElementById(id)
-  let state = null, lastChime = null, audio = null
+  let state = null, lastChime = null, audio = null, closedAt = 0
   let pageIndex = 0, pageStarted = Date.now()
+  const drawn = {}  // what was last drawn into the slower-changing parts, to skip redrawing them
   const MOOD = { quiet: 'Quiet right now', moderate: 'Getting busy', busy: 'Busy right now' }
+  const TIMER = 2 * Math.PI * 100
+
+  function fit() { document.documentElement.style.setProperty('--s', Math.min(innerWidth / 800, innerHeight / 480)) }
+  addEventListener('resize', fit)
+  fit()
 
   function chime() {  // only if the Pi has an audio output; the flashing border is the main signal
     try {
@@ -219,7 +352,27 @@
 
   const people = (n) => (n === 1 ? '1 person' : `${n} people`)
   const hourLabel = (h) => `${h % 12 === 0 ? 12 : h % 12}${h < 12 ? 'a' : 'p'}`
+  const clock = (s) => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` }
   const el = (tag, props) => Object.assign(document.createElement(tag), props)
+  function icon(name, cls = '') {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+    svg.setAttribute('class', `ico ${cls}`)
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use')
+    use.setAttribute('href', `#i-${name}`)
+    svg.append(use)
+    return svg
+  }
+  // A chip with an icon, a label and a bold value; feed text always goes in as text, never HTML.
+  function chip(name, label, value) {
+    const c = el('span', { className: 'chip' })
+    c.append(icon(name), document.createTextNode(label), el('b', { textContent: value }))
+    return c
+  }
+  function once(key, value, draw) {  // redraw only when value changes
+    if (drawn[key] === value) return
+    drawn[key] = value
+    draw()
+  }
 
   function music() {
     const m = state.music
@@ -232,44 +385,96 @@
   }
 
   function pages() {
-    // While the stall is in use there's no status page: the time is in the top bar.
     const p = state.pages || {}, free = state.stall_state === 'free'
-    const list = free ? [{ kind: 'status', secs: p.status_s || 10 }] : []
+    const list = [{ kind: 'status', secs: p.status_s || 10 }]
     const events = (state.events || []).slice(0, 3)
-    if (music()) list.push({ kind: 'lyrics', secs: state.stall_state === 'free' ? 20 : 30 })
+    if (music()) list.push({ kind: 'lyrics', secs: free ? 20 : 30 })
     if (events[0]) list.push({ kind: 'event', event: events[0], secs: p.event_s || 8 })
     if (state.insights) list.push({ kind: 'best', secs: 10 })
     for (const e of events.slice(1)) list.push({ kind: 'event', event: e, secs: p.event_s || 8 })
-    return list.length ? list : [{ kind: 'status', secs: p.status_s || 10 }]  // offline and nothing cached yet
+    return list
+  }
+
+  function showStatus(now) {
+    const free = state.stall_state === 'free', n = state.waiting || 0
+    $('st-free').hidden = !free
+    $('st-busy').hidden = free
+    $('pill').textContent = free ? 'Free' : 'In use'
+    $('pill').className = 'pill ' + (free ? 'free' : 'in_use')
+    const avg = state.insights?.stats?.avg_shower_minutes || 15
+    if (free) {
+      $('big').textContent = 'Step in whenever you like'
+      $('sub').textContent = n ? `${people(n)} in line` : 'Nobody in line'
+    } else {
+      const secs = state.since ? (now - new Date(state.since)) / 1000 : 0
+      $('timer-time').textContent = clock(secs)
+      $('timer-fill').style.strokeDashoffset = String(TIMER * (1 - Math.min(1, secs / 60 / avg)))
+      $('timer').classList.toggle('over', n > 0 && secs / 60 >= avg)
+      $('big').textContent = n ? `${people(n)} waiting` : 'Take your time'
+      $('sub').textContent = n ? 'Please keep it short.' : 'Nobody in line right now.'
+    }
+    once('queue', n, () => {
+      const q = $('queue'), shown = Math.min(n, 6)
+      q.className = 'queue' + (n ? '' : ' empty')
+      q.replaceChildren(...(n ? Array.from({ length: shown }, () => icon('person', 'solid')) : [icon('person')]))
+      if (n > shown) q.append(el('span', { className: 'more', textContent: `+${n - shown}` }))
+    })
+    const best = state.insights?.best_times?.[0], playing = music()?.now_playing
+    const chips = []
+    if (playing) chips.push(chip('note', '', playing.artist ? `${playing.title} · ${playing.artist}` : playing.title))
+    if (!free) chips.push(chip('clock', 'Average shower ', `${Math.round(avg)} min`))
+    if (best && (free || !playing)) chips.push(chip('sparkle', 'Quieter at ', best.label))
+    once('status-chips', JSON.stringify([free, playing?.title, best?.label, Math.round(avg)]), () => $('status-chips').replaceChildren(...chips))
   }
 
   function showEvent(e) {
     if ($('ev-img').getAttribute('src') !== e.image) { $('ev-img').src = e.image; $('ev-bg').src = e.image }
     $('ev-badge').hidden = !(e.tags || []).includes('free food')
-    $('ev-title').textContent = e.title               // feed text: always textContent, never HTML
+    $('ev-title').textContent = e.title
     $('ev-when').textContent = e.when || ''
     $('ev-where').textContent = e.location || ''
+    $('ev-where').parentElement.hidden = !e.location
     $('ev-tags').replaceChildren(...(e.tags || []).filter((t) => t !== 'free food')
       .map((t) => el('span', { className: 'tag', textContent: t })))
   }
 
-  function showBest() {
-    const ins = state.insights
-    $('best-title').textContent = MOOD[ins.now?.mood] || 'Getting busy'
-    $('best-chips').replaceChildren(el('span', { textContent: 'Quieter at' }),
-      ...(ins.best_times || []).map((b) => el('span', { className: 'time', textContent: b.label })))
-    const today = ins.today || []
-    $('best-bars').replaceChildren(...today.map((t) => {
-      const bar = el('i', { className: t.hour === ins.current_hour ? 'now' : '' })
-      bar.style.height = `${Math.max(2, t.occupancy * 100)}%`
-      return bar
-    }))
-    $('best-labels').replaceChildren(...today.map((t) => el('span', { textContent: t.hour % 3 === 0 ? hourLabel(t.hour) : '' })))
+  function showBest(now) {
+    const ins = state.insights, mood = ins.now?.mood || 'moderate'
+    $('best-title').textContent = MOOD[mood] || 'Getting busy'
+    $('mood-dot').className = `mood-dot ${mood}`
+    const stats = ins.stats || {}, wait = ins.now?.wait_minutes
+    once('best-stat', JSON.stringify([stats.showers_today, wait, state.waiting]), () => {
+      $('best-stat').replaceChildren()
+      if (state.waiting && wait) $('best-stat').append(el('b', { textContent: `~${Math.round(wait)} min` }), 'wait for a stall')
+      else if (stats.showers_today) $('best-stat').append(el('b', { textContent: stats.showers_today }), 'showers today')
+    })
+    const minute = Math.floor(now / 60000)
+    once('best-chips', JSON.stringify([ins.best_times, minute]), () => {
+      $('best-chips').replaceChildren(el('span', { textContent: 'Quieter at' }), ...(ins.best_times || []).map((b) => {
+        const mins = Math.round((new Date(b.at) - now) / 60000)
+        const t = el('span', { className: 'time' })
+        t.append(el('b', { textContent: b.label }),
+          el('small', { textContent: mins <= 0 ? 'now' : mins < 60 ? `in ${mins} min` : `in ${Math.round(mins / 60)} h` }))
+        return t
+      }))
+    })
+    const good = new Set((ins.best_times || []).map((b) => new Date(b.at).getHours()))
+    once('best-bars', JSON.stringify([ins.today, ins.current_hour, [...good]]), () => {
+      const today = ins.today || [], top = Math.max(0.01, ...today.map((t) => t.occupancy))
+      $('best-bars').replaceChildren(...today.map((t) => {
+        const cls = t.hour === ins.current_hour ? 'now' : t.hour < ins.current_hour ? 'past' : good.has(t.hour) ? 'good' : ''
+        const bar = el('i', { className: cls })
+        bar.style.height = `${Math.max(3, (t.occupancy / top) * 100)}%`
+        return bar
+      }))
+      $('best-labels').replaceChildren(...today.map((t) => el('span', { textContent: t.hour % 3 === 0 ? hourLabel(t.hour) : '' })))
+    })
   }
 
   function showLyrics() {
     const m = music(), np = m.now_playing, lines = m.lyrics || []
-    $('ly-song').replaceChildren(el('b', { textContent: np.title }), document.createTextNode(np.artist ? ` · ${np.artist}` : ''))
+    $('ly-title').textContent = np.title
+    $('ly-artist').textContent = np.artist || ''
     const pos = songPosition(np)
     let i = -1
     for (let k = 0; k < lines.length && lines[k][0] <= pos; k++) i = k
@@ -277,11 +482,14 @@
     $('ly-current').textContent = lines.length ? (i >= 0 ? lines[i][1] || '♪' : '♪') : 'No lyrics for this song'
     $('ly-next').textContent = lines[i + 1]?.[1] || ''
     $('ly-bar').style.width = np.duration_s ? `${Math.min(100, (pos / np.duration_s) * 100)}%` : '0%'
+    $('ly-pos').textContent = clock(np.duration_s ? Math.min(pos, np.duration_s) : pos)
+    $('ly-dur').textContent = np.duration_s ? clock(np.duration_s) : ''
   }
 
   function render() {
-    if (!state) return
     const now = Date.now()
+    $('boot').classList.toggle('show', !state || (closedAt && now - closedAt > 3000))
+    if (!state) return
     $('clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
     $('name').textContent = state.stall_name || state.stall
     $('sensor').classList.toggle('on', !!state.sensor_ok)
@@ -293,8 +501,9 @@
     $('thanks').classList.toggle('show', thanks)
     if (hurry) {
       const canHold = state.hand_hold !== false, secs = Math.round(state.hold_s || 5)
-      $('hurry-line').textContent = state.waiting ? `${people(state.waiting)} in line` : ''
-      $('holdrow').style.display = canHold ? '' : 'none'
+      $('hurry-line').hidden = !state.waiting
+      $('hurry-line').querySelector('b').textContent = state.waiting ? `${people(state.waiting)} in line` : ''
+      $('holdrow').hidden = !canHold
       $('no-hold').hidden = canHold
       $('hold-hint').textContent = `Hold your hand up to the sensor for ${secs} seconds to let them know you've seen this.`
       const hold = state.hold || 0
@@ -308,38 +517,30 @@
     if (now - pageStarted > list[pageIndex].secs * 1000) { pageIndex = (pageIndex + 1) % list.length; pageStarted = now }
     const page = list[pageIndex]
     for (const kind of ['status', 'event', 'best', 'lyrics']) $(`page-${kind}`).classList.toggle('show', page.kind === kind)
+    if (page.kind === 'status') showStatus(now)
     if (page.kind === 'event') showEvent(page.event)
-    if (page.kind === 'best') showBest()
+    if (page.kind === 'best') showBest(now)
     if (page.kind === 'lyrics' && music()) showLyrics()
-    $('pagedots').replaceChildren(...list.map((_, i) => el('i', { className: i === pageIndex ? 'on' : '' })))
+    once('dots', `${list.length}/${pageIndex}`, () =>
+      $('pagedots').replaceChildren(...list.map((_, i) => el('i', { className: i === pageIndex ? 'on' : '' }))))
 
     const free = state.stall_state === 'free'
-    const minsIn = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : null
-    $('top-state').textContent = free ? 'Free' : `In use · ${minsIn ?? 0} min`
+    const minsIn = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : 0
+    $('top-state').textContent = free ? 'Free' : `In use · ${minsIn} min`
     $('top-state').className = 'state ' + (free ? 'free' : 'in_use')
-    $('top-waiting').textContent = state.waiting ? `${people(state.waiting)} waiting` : ''
-    $('pill').textContent = free ? 'Free' : 'In use'
-    $('pill').className = 'pill ' + (free ? 'free' : 'in_use')
-    const mins = state.since ? Math.max(0, Math.floor((now - new Date(state.since)) / 60000)) : null
-    $('big').textContent = free ? 'Step in whenever you like' : (mins !== null ? `${mins} min` : 'In use')
-    $('sub').textContent = state.waiting
-      ? (free ? `${people(state.waiting)} in line` : `${people(state.waiting)} waiting. Please keep it short.`)
-      : 'Nobody in line'
-    const best = state.insights?.best_times?.[0]
-    const playing = music()
-    $('status-hint').hidden = !(best || playing)
-    if (playing) $('status-hint').replaceChildren(document.createTextNode('♪ '), el('b', { textContent: playing.now_playing.title }),
-      document.createTextNode(playing.now_playing.artist ? ` · ${playing.now_playing.artist}` : ''))
-    else if (best) $('status-hint').replaceChildren(document.createTextNode('Quieter at '), el('b', { textContent: best.label }))
+    $('top-waiting').hidden = !state.waiting
+    $('top-waiting').querySelector('span').textContent = `${state.waiting} waiting`
 
     const until = state.reserved_until ? new Date(state.reserved_until).getTime() : 0
     const left = Math.round((until - now) / 1000)
     $('reserved').hidden = !(free && left > 0)
-    if (left > 0) $('reserved').textContent = `Held for the next person in line · ${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`
+    $('stage').classList.toggle('reserved', free && left > 0)
+    if (left > 0) $('reserved-left').textContent = clock(left)
   }
 
   function connect() {
     const ws = new WebSocket(`ws://${location.hostname || 'localhost'}:8765`)
+    ws.onopen = () => { closedAt = 0 }
     ws.onmessage = (e) => {
       const next = JSON.parse(e.data)
       if ((!state?.notify && next.notify) || (lastChime !== null && next.chime > lastChime && next.notify)) {
@@ -349,7 +550,11 @@
       state = next
       render()
     }
-    ws.onclose = () => setTimeout(connect, 1000)
+    ws.onclose = () => {
+      closedAt = closedAt || Date.now()
+      $('boot-text').textContent = 'Reconnecting to the stall agent…'
+      setTimeout(connect, 1000)
+    }
   }
   connect()
   setInterval(render, 200)
