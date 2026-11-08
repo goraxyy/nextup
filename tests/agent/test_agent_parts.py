@@ -75,7 +75,9 @@ def test_hand_hold_fires_once_after_two_seconds_with_progress():
     progress = [v for k, v in events if k == "hold.progress"]
     assert progress == sorted(progress) and progress[-1] == 1.0
     assert p.update(PERSON, 4.1) == []                         # one stray reading: still holding
-    assert p.update(PERSON, 4.5) == [("hold.progress", 0.0)]   # hand down: reset
+    assert p.update(PERSON, 4.5) == [("hold.progress", 0.6)]   # hand down: the ring drains back...
+    assert p.update(PERSON, 4.9) == [("hold.progress", 0.2)]   # ...at twice the speed it filled
+    assert p.update(PERSON, 5.3) == [("hold.progress", 0.0)]
 
 
 def test_a_stray_reading_does_not_break_a_hold():

@@ -331,3 +331,41 @@ def test_radar_setup_settings():
         load({**RADAR_ENV, "RADAR_GATE_CM": "50"})
     with pytest.raises(SystemExit, match="RADAR_MOVING_SENS"):
         load({**RADAR_ENV, "RADAR_MOVING_SENS": "1,2,3"})
+
+
+# A hand held up to the radar (what the Pi logged on 2026-11-08) -------------------------
+
+
+def test_with_20_cm_gates_the_hand_is_read_from_the_nearest_gates():
+    radar = LD2410Sensor(hold=True, hold_max_cm=30, hold_min_energy=50)
+    radar.gate_cm = 20
+    # The reported target says the arm at 40 cm, but gates 0-1 (0-40 cm) still see the hand.
+    arm = RadarFrame(3, 40, 100, 40, 100, moving_gates=(100, 90, 100, 30, 10, 5, 5, 5, 5), still_gates=(0,) * 9)
+    assert radar.hand_near(arm)
+    # Someone 60 cm away, no hand: gates 0-1 stay low.
+    person = RadarFrame(3, 60, 52, 54, 100, moving_gates=(13, 13, 21, 52, 25, 12, 7, 6, 4), still_gates=(0,) * 9)
+    assert not radar.hand_near(person)
+    radar.gate_cm = 75  # coarse gates: back to the reported target
+    assert not radar.hand_near(arm) and radar.hand_near(RadarFrame(1, 12, 80, 0, 0, moving_gates=(80,) * 9))
+
+
+def test_a_radar_hold_survives_the_target_flicking_away():
+    p = Presence(load({**RADAR_ENV, "ULTRASONIC": "off"}))
+    p.hold_armed = True
+    out, t = [], 0.0
+    while t < 9:  # 1.2 s of hand, then 0.5 s where the radar loses it, over and over
+        near = (t % 1.7) < 1.2
+        out += [k for k, _ in p.update(Reading(12, present=True, hold_near=near), t)]
+        t += 0.1
+    assert out.count("input.hold") == 1
+
+
+def test_a_lowered_hand_drains_the_ring_instead_of_restarting_it():
+    p = Presence(load({**RADAR_ENV, "ULTRASONIC": "off"}))
+    p.hold_armed = True
+    hand, away = Reading(12, present=True, hold_near=True), Reading(70, present=True, hold_near=False)
+    kinds(p, hand, 0, 3, step=0.1)                      # 3 s of the 5 s hold
+    kinds(p, away, 3.1, 4.5, step=0.1)                   # hand down 1.5 s: 1 s grace, then 0.5 s drains 0.2
+    assert 0.3 < p.hold_progress < 0.45                  # about 0.6 - 0.2: kept most of it
+    assert kinds(p, hand, 4.6, 7.0, step=0.1).count("input.hold") == 0   # 2.4 s more: not yet
+    assert kinds(p, hand, 7.1, 8.2, step=0.1).count("input.hold") == 1   # about 3 s more, not 5: no restart

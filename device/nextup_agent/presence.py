@@ -11,7 +11,13 @@ the HC-SR04's readings are only used for the hand-hold. Radar distances never co
 from .config import Config
 from .sensor import Reading
 
-HOLD_GRACE_S = 0.3  # one stray reading doesn't break a hand-hold
+HOLD_GRACE_S = 0.3        # HC-SR04: one stray reading doesn't break a hand-hold
+# The radar's target jumps between the hand and the arm or body behind it, and it sometimes
+# reports no moving target for a moment while the hand is still there: forgive longer gaps.
+RADAR_HOLD_GRACE_S = 1.0
+# After the grace, the ring drains back at twice the speed it filled, instead of starting over:
+# a slip costs a little of the hold, not all of it.
+HOLD_DRAIN = 2.0
 
 
 class Presence:
@@ -26,10 +32,11 @@ class Presence:
         self.state = "free"
         self.present_since: float | None = None
         self.absent_since: float | None = None
-        self.hold_since: float | None = None
+        self.hold_progress = 0.0   # 0-1: how much of HOLD_SECONDS the hand has been held
+        self.hold_at: float | None = None  # time of the last reading seen by _hold
         self.hold_last_near = 0.0
         self.hold_fired = False
-        self.last_progress = 0.0
+        self.last_progress = 0.0   # the last progress sent to the screen
         # Holds only count while the Hurry pop-up is on the screen (the agent arms this), so moving
         # around in the shower can't acknowledge anything by accident.
         self.hold_armed = False
@@ -45,10 +52,10 @@ class Presence:
             out += self._presence(reading, now)
         if radar:
             if reading.hold_near is not None:  # RADAR_HOLD: a hand raised to the radar
-                out += self._hold(reading.hold_near, now)
+                out += self._hold(reading.hold_near, now, RADAR_HOLD_GRACE_S)
         else:
             d = reading.distance_cm
-            out += self._hold(d is not None and d <= self.cfg.hold_max_cm, now)
+            out += self._hold(d is not None and d <= self.cfg.hold_max_cm, now, HOLD_GRACE_S)
         return out
 
     def _presence(self, reading: Reading, now: float) -> list[tuple[str, float | None]]:
@@ -72,26 +79,27 @@ class Presence:
             out.append(("session.end", None))
         return out
 
-    def _hold(self, near: bool, now: float) -> list[tuple[str, float | None]]:
+    def _hold(self, near: bool, now: float, grace: float) -> list[tuple[str, float | None]]:
         out: list[tuple[str, float | None]] = []
-        cfg = self.cfg
+        dt = 0.0 if self.hold_at is None else max(0.0, min(0.5, now - self.hold_at))  # a long gap counts as 0.5 s
+        self.hold_at = now
         if not self.hold_armed:
-            if self.hold_since is not None:
-                self.hold_since, self.hold_fired, self.last_progress = None, False, 0.0
+            if self.hold_progress or self.last_progress:
+                self.hold_progress, self.hold_fired, self.last_progress = 0.0, False, 0.0
                 out.append(("hold.progress", 0.0))
             return out
         if near:
             self.hold_last_near = now
-            self.hold_since = self.hold_since if self.hold_since is not None else now
-            progress = min(1.0, (now - self.hold_since) / cfg.hold_s)
-            if progress - self.last_progress >= 0.05 or (progress == 1.0 and self.last_progress < 1.0):
-                self.last_progress = progress
-                out.append(("hold.progress", round(progress, 2)))
-            if progress >= 1.0 and not self.hold_fired:
-                self.hold_fired = True
-                out.append(("input.hold", None))
-        elif self.hold_since is not None and now - self.hold_last_near > HOLD_GRACE_S:
-            # The hand went away: reset, so the next hold needs the full HOLD_SECONDS again.
-            self.hold_since, self.hold_fired, self.last_progress = None, False, 0.0
-            out.append(("hold.progress", 0.0))
+            self.hold_progress = min(1.0, self.hold_progress + dt / self.cfg.hold_s)
+        elif now - self.hold_last_near > grace:  # the hand went away: drain, don't start over
+            self.hold_progress = max(0.0, self.hold_progress - dt * HOLD_DRAIN / self.cfg.hold_s)
+        progress = 1.0 if self.hold_progress > 1 - 1e-6 else round(self.hold_progress, 2)
+        if progress == 0.0:
+            self.hold_fired = False  # fully drained: the next hold can count again
+        if abs(progress - self.last_progress) >= 0.05 or (progress in (0.0, 1.0) and progress != self.last_progress):
+            self.last_progress = progress
+            out.append(("hold.progress", progress))
+        if progress == 1.0 and not self.hold_fired:
+            self.hold_fired = True
+            out.append(("input.hold", None))
         return out

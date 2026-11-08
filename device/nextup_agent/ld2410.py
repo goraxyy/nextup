@@ -364,10 +364,18 @@ class LD2410Sensor:
                      moving, still, "yes" if raw else "no", self.filter.score, "OCCUPIED" if occupied else "free")
             if f.moving_gates:
                 log.info("radar gates: moving %s | still %s", gates_text(f.moving_gates), gates_text(f.still_gates))
-        hold_near = None
-        if self.hold:  # a hand raised to the radar: a strong moving target very close to it
-            hold_near = bool(f.state & 1) and 0 < f.moving_cm <= self.hold_max_cm and f.moving_energy >= self.hold_min_energy
-        return Reading(distance_cm=nearest_cm(f), present=occupied, hold_near=hold_near)
+        return Reading(distance_cm=nearest_cm(f), present=occupied, hold_near=self.hand_near(f) if self.hold else None)
+
+    def hand_near(self, f: RadarFrame) -> bool:
+        """A hand raised to the radar: strong movement within RADAR_HOLD_MAX_CM of it.
+
+        The radar reports one moving target, the strongest, and with a hand up it jumps between
+        the hand and the arm or body behind it. With 20 cm gates the energy at the nearest gates
+        is steadier, so that decides; otherwise the reported target does.
+        """
+        if f.moving_gates and self.gate_cm and self.gate_cm <= self.hold_max_cm:
+            return max(f.moving_gates[: math.ceil(self.hold_max_cm / self.gate_cm)]) >= self.hold_min_energy
+        return bool(f.state & 1) and 0 < f.moving_cm <= self.hold_max_cm and f.moving_energy >= self.hold_min_energy
 
     # Setup and calibration ---------------------------------------------------------------
 
