@@ -6,6 +6,12 @@ speaker into something worth looking at: synced lyrics, campus events, wellness 
 
 Built at MakeCU 2026 (Creativity track).
 
+## Demo video
+
+[![NextUp demo video](https://img.youtube.com/vi/OZj-qjhfW3w/maxresdefault.jpg)](https://www.youtube.com/watch?v=OZj-qjhfW3w)
+
+Watch the 3-minute demo on YouTube: https://www.youtube.com/watch?v=OZj-qjhfW3w
+
 ## Core features
 
 - **Live status:** each stall reports FREE / OCCUPIED to the website in real time.
