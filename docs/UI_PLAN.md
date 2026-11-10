@@ -20,6 +20,8 @@ already works; everything here builds on it.
   login). LRCLIB returns synced lyrics (78 timed lines for a test song). The Mac Music app's
   scripting dictionary has the current track, play state and player position.
 - The Pi has no speaker. Music comes from Apple Music on a Mac, through a Bluetooth speaker.
+  (Update, November 2026: the stall can also follow the showering person's own Spotify, playing
+  from their phone to the Bluetooth speaker; see [infra/pi/music](../infra/pi/music/README.md).)
 
 ## 1. Remove the floor code (15 min)
 
@@ -238,7 +240,7 @@ choose a stall, hurry it, see it acknowledged, in Columbia colors, with campus e
 Tests: SQL tests for `request_hurry`, the simulator (lengths and pace) and `busy_profile`; API
 tests for Hurry, insights, events and lyrics; agent tests for the 5-second and radar holds and
 the page scheduler; the end-to-end smoke test; screenshots of the website (phone and desktop) and
-the stall screen at 1024 × 600.
+the stall screen at 800 × 480 (the real stall screen, an HCTG070V; the layout scales up to 1024 × 600).
 
 The stall screen and agent are shared with Nurislam's radar work, so pull first and keep
 changes to `device/` in small, separate commits.

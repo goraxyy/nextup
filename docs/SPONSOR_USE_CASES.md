@@ -1,6 +1,6 @@
 # Use cases, aimed at MakeCU 2026 sponsors
 
-Same box everywhere: a Raspberry Pi 3, an HC-SR04 ultrasonic distance sensor, a 7" screen and a speaker, with Tiger Data
+Same box everywhere: a Raspberry Pi 4, an LD2410C mmWave radar (an HC-SR04 ultrasonic distance sensor also works), a 7" screen and a speaker, with Tiger Data
 behind it. Each idea below says what it does, whose problem it solves, and how much of NextUp it
 reuses.
 
@@ -32,11 +32,15 @@ checked 2026-11-07:
 
 ## What the sensor can and can't do
 
-The HC-SR04 measures one distance, to the nearest thing in a narrow cone in front of it (about
-2 cm to 4 m), around ten times a second. It can't tell moving from still, can't see through doors
-or curtains, can't count people and can't tell who anyone is. Ideas 1, 10, 11 and 19 were written
-for a radar (stillness, per-gate energies, motion through a machine door); with the HC-SR04 they
-need a radar or another sensor added.
+The demo stall uses the LD2410C radar: about ten times a second it reports moving and still
+targets out to about 1.6 m, with the signal strength at each 20 cm step, and it sees through
+plastic. It can't count people, tell who anyone is, or tell left from right (it measures distance
+only). Ideas 1, 10, 11 and 19 rely on exactly this (stillness, per-step energies, motion behind a
+cover).
+
+The cheaper HC-SR04 measures one distance, to the nearest thing in a narrow cone in front of it
+(about 2 cm to 4 m). It can't tell moving from still or see through doors or curtains, so with it
+those four ideas need the radar added.
 
 ## The 20
 

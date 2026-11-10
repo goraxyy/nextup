@@ -8,8 +8,13 @@ to [#11](https://github.com/goraxyy/nextup/issues/11), open questions in
 [#12](https://github.com/goraxyy/nextup/issues/12)). Tick boxes there; this file is the original
 plan. Each phase ends with a **Done when** check.
 
-Hardware assumed per stall: Raspberry Pi 3, HC-SR04 ultrasonic distance sensor, HCTG070V 7" display (no touch).
-One speaker per shower room on the 3.5 mm jack.
+Hardware assumed per stall when this plan was written: Raspberry Pi 3, HC-SR04 ultrasonic
+distance sensor, HCTG070V 7" display (no touch), one speaker per shower room on the 3.5 mm jack.
+
+**Hardware used now (November 2026):** Raspberry Pi 4 Model B, HLK-LD2410C 24 GHz mmWave radar
+for presence and hand gestures (the HC-SR04 is optional and unplugged on the demo stall), the
+HCTG070V 7" display at 800 × 480, and a Bluetooth speaker paired with the showering person's
+phone. See the hardware table in [README.md](README.md).
 
 Services: Tiger Data, Vercel, Supabase, Gemini API (Ask the board only), GoDaddy Registry. The
 backend design is in [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
@@ -197,7 +202,7 @@ Full design: [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 - [ ] Security: rotate device tokens, rate limits, no personal data stored, privacy page (no cameras, no microphones)
 - [ ] Load test the WebSocket hub with 50 simulated devices
 - [ ] `CREDITS.md`: libraries, APIs, music and data sources (the handbook requires credit)
-- [ ] Devpost: tag the Creativity track and the Tiger Data, Gemini API and GoDaddy Registry challenges
+- [x] Devpost: tag the Environmental track (we entered it, and won it) and the Tiger Data, Gemini API and GoDaddy Registry challenges
 
 **Done when:** a device survives a server restart and a Wi-Fi drop without manual help, and all docs above exist.
 
@@ -207,7 +212,9 @@ Full design: [docs/BACKEND_PLAN.md](docs/BACKEND_PLAN.md).
 
 Each question has a recommended answer. Tick it once the team agrees.
 
-- [ ] **Display: what are the HCTG070V's interface and resolution?** (Blocks the Phase 1 display setup)
+- [x] **Display: what are the HCTG070V's interface and resolution?** (Blocks the Phase 1 display setup)
+  - **Answered:** it runs at 800 × 480. The stall screen is laid out on an 800 × 480 stage and
+    scales to fit other screens.
   - Recommendation: if it has an HDMI port, plug it in and read the modes it reports from `/sys/class/drm/card*-HDMI-A-1/modes`. The display announces its own resolution, so usually no config is needed.
   - Design the kiosk for 1024×600 and check it at 800×480, with a layout that scales, so the UI works either way.
   - If it only has a flat ribbon connector, it needs a driver board (ECE side).
