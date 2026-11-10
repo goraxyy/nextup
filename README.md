@@ -42,9 +42,8 @@ What the demo stall (Stall 1) runs on:
 | Raspberry Pi 4 Model B (Raspberry Pi OS, Debian 13) | Runs the device agent and the screen (Chromium kiosk) |
 | HLK-LD2410C 24 GHz mmWave radar, on the Pi's UART | Presence in the stall, including someone standing still; the hand-hold that answers a Hurry; hand gestures for the music (pause, skip) and for choosing a shower goal |
 | HCTG070V 7" display, 800 × 480, no touch | The stall screen |
-| Waterproof plastic cover | Protects the radar; the radar is fixed flat against it and sees through it |
 | Bluetooth speaker | Music: it pairs with the showering person's phone, whose Spotify app plays; the Pi follows along for synced lyrics and gestures |
-| 5 V 3 A USB-C power supply (recommended) | Powers the Pi, which powers the radar; a weaker supply caused undervoltage warnings and a reboot |
+| Power bank (USB-C) | Powers the Pi, which powers the radar |
 
 Radar wiring (no voltage divider; its UART is 3.3 V): VCC → 5V (pin 4), GND → GND (pin 14),
 TX → GPIO15 (pin 10), RX → GPIO14 (pin 8). The Pi's own Bluetooth is turned off so the radar can

@@ -16,16 +16,15 @@ Supabase Realtime device:<stall> ──► stall screen: Notify pop-up, re-chime
 ## Hardware on the demo stall
 
 - **Raspberry Pi 4 Model B**, Raspberry Pi OS (Debian 13), Chromium in kiosk mode.
-- **HLK-LD2410C 24 GHz mmWave radar** on the UART (wiring below), taped flat against the
-  waterproof plastic cover. It decides presence and reads a raised hand (the Hurry hand-hold,
-  music gestures, the shower-goal question).
+- **HLK-LD2410C 24 GHz mmWave radar** on the UART (wiring below). It decides presence and reads
+  a raised hand (the Hurry hand-hold, music gestures, the shower-goal question).
 - **HCTG070V 7" display**, 800 × 480, no touch. The stall screen is laid out at 800 × 480 and
   scales to other sizes.
 - **No HC-SR04** (`ULTRASONIC=off`) and **no speaker on the Pi**: its Bluetooth is off to free the
   UART, so the Bluetooth speaker pairs with the showering person's phone
   ([infra/pi/music](../infra/pi/music/README.md)).
-- **5 V 3 A USB-C supply** recommended: with a weaker one the Pi reported undervoltage. Plug and
-  unplug the radar only with the Pi powered off; doing it live once made the Pi reboot.
+- **Power bank** over USB-C, powering the Pi (and through it the radar). Plug and unplug the
+  radar only with the Pi powered off; doing it live once made the Pi reboot.
 
 ## Option: HC-SR04 ultrasonic sensor
 
